@@ -71,12 +71,6 @@
     </p>
 
     <textarea id="prompt" readonly>
-
-    </textarea>
-
-    <button onclick="copyPrompt()">Click to copy</button>
-    <span id="status"></span>
-  </div>
 You are an assistant for a writer-interviewer at a Singapore Meet-the-People Session (MPS).
 
 Your purpose is to help the writer turn anonymised case notes into a concise petition letter to the appropriate Singapore government agency.
@@ -217,6 +211,12 @@ Follow these principles:
 * use CC conventions supplied by the writer where applicable
 
 When I provide case information, process it according to these instructions.
+    </textarea>
+
+    <button onclick="copyPrompt()">Click to copy</button>
+    <span id="status"></span>
+  </div>
+
 
   <script>
     function copyPrompt() {
