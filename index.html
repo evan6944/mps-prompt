@@ -1,9 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MPS Prompt</title>
+  <meta name="referrer" content="no-referrer">
+  <title>MPS Rewriter</title>
 
   <style>
     body {
@@ -23,27 +25,40 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     }
 
-    h1 {
-      margin-top: 0;
+    h1 { margin-top: 0; }
+
+    label {
+      display: block;
+      margin: 18px 0 6px;
+      font-weight: bold;
+    }
+
+    textarea, input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
     }
 
     textarea {
-      width: 100%;
-      min-height: 500px;
-      box-sizing: border-box;
-      padding: 15px;
-      font-family: monospace;
-      font-size: 14px;
-      line-height: 1.5;
-      border: 1px solid #ccc;
-      border-radius: 8px;
+      min-height: 300px;
       resize: vertical;
+      line-height: 1.5;
+    }
+
+    #result {
+      min-height: 250px;
+      background: #fafafa;
     }
 
     button {
       margin-top: 15px;
+      margin-right: 8px;
       padding: 12px 20px;
-      font-size: 16px;
+      font-size: 15px;
       border: none;
       border-radius: 7px;
       cursor: pointer;
@@ -51,12 +66,23 @@
       color: white;
     }
 
-    button:hover {
-      opacity: 0.85;
+    button:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    button.secondary {
+      background: #666;
     }
 
     #status {
-      margin-left: 10px;
+      margin-top: 12px;
+      color: #555;
+      overflow-wrap: anywhere;
+    }
+
+    .note {
+      font-size: 13px;
       color: #555;
     }
   </style>
@@ -64,171 +90,118 @@
 
 <body>
   <div class="container">
-    <h1>MPS Prompt</h1>
+    <h1>MPS Rewriter</h1>
 
-    <p>
-      Last edit: 05/10/2026
-    </p>
+    <p>Enter case notes below to generate a draft using your local model.</p>
 
-    <textarea id="prompt" readonly>
-You are an assistant for a writer-interviewer at a Singapore Meet-the-People Session (MPS).
+    <label for="apiKey">Access key</label>
+    <input
+      id="apiKey"
+      type="password"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="Enter your MPS API key"
+    >
+    <p class="note">The key is not saved by this page. Clear it when finished.</p>
 
-Your purpose is to help the writer turn anonymised case notes into a concise petition letter to the appropriate Singapore government agency.
+    <label for="notes">Case notes</label>
+    <textarea
+      id="notes"
+      placeholder="Paste case notes here..."
+      spellcheck="true"
+    ></textarea>
 
-PRIVACY
+    <button id="rewriteButton" onclick="rewriteNotes()">Rewrite</button>
+    <div id="status" role="status" aria-live="polite"></div>
 
-The information supplied to you is deliberately anonymised.
+    <label for="result">Draft</label>
+    <textarea
+      id="result"
+      readonly
+      placeholder="The rewritten draft will appear here..."
+      spellcheck="false"
+    ></textarea>
 
-Do not ask for or infer unnecessary identifying information such as:
-
-* resident’s name
-* NRIC/FIN
-* exact address
-* telephone number
-* email address
-* other unnecessary identifiers
-
-Use these placeholders:
-[RESIDENT]
-[RESIDENT 2]
-[SPOUSE]
-[CHILD 1]
-[CHILD 2]
-[PARENT]
-[THIRD PARTY]
-
-Do not invent names.
-
-Always use [RESIDENT] rather than Mr X, Ms Y or similar placeholders.
-
-Avoid he/she, his/her and him/her. Rewrite sentences to avoid gendered pronouns where practical. Use [RESIDENT]’s where a possessive is required.
-
-ROLE
-
-You support the MPS writer. You do not represent the government, make decisions for an agency, or promise an outcome.
-
-FACTUAL DISCIPLINE
-
-Use only information supplied in the case notes or interview.
-
-Distinguish between:
-
-* established facts
-* what the resident says or believes
-* information that is unknown
-
-Do not turn an allegation or assumption into an established fact.
-
-Do not invent dates, amounts, diagnoses, applications, income, family circumstances or previous correspondence.
-
-Do not exaggerate hardship.
-
-Do not make accusations or moral judgements unless clearly supported by the facts.
-
-DRAFTING STYLE
-
-Letters must be:
-
-* professional
-* neutral
-* respectful
-* concise
-* factual
-* resident-centric
-
-Use British spelling.
-
-Use dates in DD MMM YYYY format.
-
-Where relevant, include reference numbers, dates, correspondence, previous applications or appeals, actions already taken, and relevant third-party information.
-
-Use broader government policies or national objectives only where they genuinely strengthen the appeal. Do not force them into the letter.
-
-PETITION LETTER
-
-Begin with:
-
-[RESIDENT] appeals for [specific request].
-
-End with:
-
-Please assist [RESIDENT] with [RESIDENT]’s appeal. Thank you.
-
-RECIPIENT SELECTION
-
-Choose the most appropriate recipient from the list of government agencies.
-
-Do not automatically choose the parent ministry merely because it is the parent ministry of an agency.
-
-Where two recipients have materially different roles, produce separately contextualised versions rather than duplicating the same letter.
-
-If recipient selection is genuinely uncertain, say so briefly.
-
-TRANSCRIPTION MODE
-
-The final answer will be read on an iPhone and manually typed into a separate MPS system which may be air-gapped.
-
-Therefore:
-
-* use plain text only for the petition letter
-* do not use tables
-* do not use markdown inside the letter
-* use short paragraphs
-* keep lines reasonably short
-* do not add unnecessary commentary
-* make the letter easy to read while scrolling vertically on a phone
-
-Return the result in this order:
-
-RECIPIENT
-[recipient]
-
-CC
-[CC, if applicable]
-
-LETTER
-
-[petition letter]
-
-WRITER TO VERIFY
-[only include this section if there is a genuinely material point to verify]
-
-The WRITER TO VERIFY section must not be part of the petition letter.
-
-INTERNAL DRAFTING PRINCIPLES
-
-Follow these principles:
-
-* one recipient per letter
-* use the most appropriate available recipient
-* use the resident’s perspective rather than advocacy language
-* include only relevant background
-* maintain a logical chronology
-* do not speculate
-* do not promise an outcome
-* do not overstate the resident’s position
-* contextualise separate versions for separate agencies
-* use CC conventions supplied by the writer where applicable
-
-When I provide case information, process it according to these instructions.
-    </textarea>
-
-    <button onclick="copyPrompt()">Click to copy</button>
-    <span id="status"></span>
+    <button class="secondary" id="copyButton" onclick="copyDraft()" disabled>
+      Copy draft
+    </button>
   </div>
 
-
   <script>
-    function copyPrompt() {
-      const prompt = document.getElementById("prompt");
+    // This Quick Tunnel URL is temporary. Update it if the tunnel changes.
+    const API_URL =
+      "https://expires-wild-kelly-respectively.trycloudflare.com/api/rewrite";
 
-      navigator.clipboard.writeText(prompt.value).then(() => {
-        document.getElementById("status").textContent = "Copied!";
-        
-        setTimeout(() => {
-          document.getElementById("status").textContent = "";
-        }, 2000);
-      });
+    async function rewriteNotes() {
+      const key = document.getElementById("apiKey").value.trim();
+      const notes = document.getElementById("notes").value.trim();
+      const button = document.getElementById("rewriteButton");
+      const status = document.getElementById("status");
+      const result = document.getElementById("result");
+      const copyButton = document.getElementById("copyButton");
+
+      if (!key) {
+        status.textContent = "Enter your access key.";
+        return;
+      }
+
+      if (!notes) {
+        status.textContent = "Enter case notes first.";
+        return;
+      }
+
+      button.disabled = true;
+      copyButton.disabled = true;
+      result.value = "";
+      status.textContent = "Rewriting. This may take a little while...";
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-MPS-Key": key
+          },
+          body: JSON.stringify({ text: notes })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Access key rejected. Check your key.");
+          }
+          throw new Error(data.detail || `Request failed (${response.status}).`);
+        }
+
+        result.value = data.result || "";
+        if (!result.value) {
+          throw new Error("The model returned an empty draft.");
+        }
+
+        copyButton.disabled = false;
+        status.textContent = "Draft ready. Check it carefully before use.";
+      } catch (error) {
+        status.textContent =
+          "Could not rewrite: " + error.message +
+          ". Check that your PC, API and tunnel are running.";
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyDraft() {
+      const result = document.getElementById("result");
+      const status = document.getElementById("status");
+
+      try {
+        await navigator.clipboard.writeText(result.value);
+        status.textContent = "Draft copied.";
+      } catch {
+        result.focus();
+        result.select();
+        status.textContent = "Select and copy the draft manually.";
+      }
     }
   </script>
 </body>
