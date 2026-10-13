@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,203 +5,405 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
   <title>MPS Rewriter</title>
-
   <style>
+    :root {
+      color-scheme: light dark;
+      --page: #f2f4f7;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #17202b;
+      --muted: #5d6877;
+      --border: #d8dee7;
+      --primary: #26384a;
+      --primary-hover: #344b62;
+      --success: #176b43;
+      --danger: #a52b2b;
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #11161d;
+        --surface: #1b232d;
+        --surface-soft: #151c24;
+        --text: #edf2f7;
+        --muted: #b0bac7;
+        --border: #394553;
+        --primary: #dce8f5;
+        --primary-hover: #ffffff;
+        --success: #7bd6a4;
+        --danger: #ff9999;
+      }
+      button.primary { color: #17202b; }
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 20px;
+      margin: 0;
+      padding: 28px 16px 48px;
+      background: var(--page);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
       line-height: 1.5;
-      background: #f5f5f5;
-      color: #222;
     }
-
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    main { width: 100%; max-width: 1000px; margin: 0 auto; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(18px, 3vw, 30px);
+      margin-bottom: 18px;
     }
-
-    h1 { margin-top: 0; }
-
-    label {
-      display: block;
-      margin: 18px 0 6px;
-      font-weight: bold;
-    }
-
-    textarea, input {
+    h1 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 0 0 6px; }
+    h2 { font-size: 1.12rem; margin: 0 0 12px; }
+    p { margin: 8px 0 14px; }
+    .muted, .note { color: var(--muted); font-size: .9rem; }
+    label { display: block; font-weight: 700; margin: 16px 0 7px; }
+    input, textarea {
       width: 100%;
-      box-sizing: border-box;
-      padding: 12px;
-      font-family: inherit;
-      font-size: 14px;
-      border: 1px solid #ccc;
+      color: var(--text);
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
       border-radius: 8px;
+      padding: 12px;
+      font: inherit;
     }
-
-    textarea {
-      min-height: 300px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    #result {
-      min-height: 250px;
-      background: #fafafa;
-    }
-
+    input { min-height: 44px; }
+    textarea { resize: vertical; line-height: 1.55; }
+    #notes { min-height: 260px; }
+    .output { min-height: 220px; }
     button {
-      margin-top: 15px;
-      margin-right: 8px;
-      padding: 12px 20px;
-      font-size: 15px;
-      border: none;
-      border-radius: 7px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 15px;
+      margin: 10px 8px 0 0;
+      background: var(--surface-soft);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
       cursor: pointer;
-      background: #222;
-      color: white;
     }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: wait;
-    }
-
-    button.secondary {
-      background: #666;
-    }
-
-    #status {
-      margin-top: 12px;
-      color: #555;
-      overflow-wrap: anywhere;
-    }
-
-    .note {
-      font-size: 13px;
-      color: #555;
+    button.primary { background: var(--primary); color: #fff; border-color: transparent; }
+    button.primary:hover { opacity: .88; }
+    button:disabled { opacity: .48; cursor: wait; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .row button { margin-right: 0; }
+    .status { min-height: 1.5em; margin: 12px 0 0; overflow-wrap: anywhere; }
+    .status.error { color: var(--danger); }
+    .status.success { color: var(--success); }
+    .hidden { display: none !important; }
+    .connection-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+    .connected { color: var(--success); font-weight: 700; }
+    .system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .metric { padding: 12px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; min-width: 0; }
+    .metric-label { color: var(--muted); font-size: .82rem; margin-bottom: 4px; }
+    .metric-value { font-weight: 700; overflow-wrap: anywhere; }
+    .meter { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 8px; }
+    .meter-fill { height: 100%; width: 0; background: #4a9b74; transition: width .2s ease; }
+    details summary { cursor: pointer; font-weight: 700; }
+    .output-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .output-heading label { margin: 16px 0 7px; }
+    footer { color: var(--muted); font-size: .82rem; padding: 0 4px; }
+    @media (max-width: 560px) {
+      body { padding: 14px 10px 30px; }
+      .panel { padding: 16px; }
+      #notes { min-height: 220px; }
+      .output { min-height: 190px; }
     }
   </style>
 </head>
-
 <body>
-  <div class="container">
+<main>
+  <header class="panel">
     <h1>MPS Rewriter</h1>
+    <p class="muted">Draft petition letters using the local model on your PC. Review all generated text before use.</p>
+    <div id="disconnectedView">
+      <label for="apiKey">Access key</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your MPS access key">
+      <div class="row">
+        <button id="connectButton" class="primary" type="button">Connect</button>
+      </div>
+      <p class="note">The access key is kept in this page's memory only. It is not saved to browser storage. Refreshing the page disconnects it.</p>
+    </div>
+    <div id="connectedView" class="hidden">
+      <div class="connection-line">
+        <span class="connected">Connected and authenticated</span>
+        <button id="disconnectButton" type="button">Disconnect</button>
+      </div>
+      <p class="note">Your access key is hidden. Disconnect or refresh the page to clear it from this page's memory.</p>
+    </div>
+    <p id="connectionStatus" class="status" role="status" aria-live="polite"></p>
+  </header>
 
-    <p>Enter case notes below to generate a draft using your local model.</p>
+  <section class="panel" aria-labelledby="systemHeading">
+    <div class="connection-line">
+      <h2 id="systemHeading">System status</h2>
+      <button id="refreshStatusButton" type="button" disabled>Refresh status</button>
+    </div>
+    <div class="system-grid">
+      <div class="metric"><div class="metric-label">API connection</div><div id="apiMetric" class="metric-value">Not connected</div></div>
+      <div class="metric"><div class="metric-label">Configured model</div><div id="configuredModel" class="metric-value">—</div></div>
+      <div class="metric"><div class="metric-label">Loaded Ollama model</div><div id="loadedModel" class="metric-value">—</div></div>
+      <div class="metric"><div class="metric-label">GPU utilisation</div><div id="gpuUtil" class="metric-value">—</div><div class="meter"><div id="gpuUtilBar" class="meter-fill"></div></div></div>
+      <div class="metric"><div class="metric-label">GPU memory</div><div id="gpuMemory" class="metric-value">—</div><div class="meter"><div id="gpuMemoryBar" class="meter-fill"></div></div></div>
+      <div class="metric"><div class="metric-label">GPU temperature</div><div id="gpuTemp" class="metric-value">—</div></div>
+    </div>
+    <p id="systemNote" class="note">Connect to view authenticated system information. GPU readings require NVIDIA's nvidia-smi utility to be accessible on the host PC.</p>
+    <p id="lastStatusUpdate" class="note">Last status update: never</p>
+  </section>
 
-    <label for="apiKey">Access key</label>
-    <input
-      id="apiKey"
-      type="password"
-      autocomplete="off"
-      spellcheck="false"
-      placeholder="Enter your MPS API key"
-    >
-    <p class="note">The key is not saved by this page. Clear it when finished.</p>
+  <section class="panel" aria-labelledby="inputHeading">
+    <h2 id="inputHeading">Case notes</h2>
+    <label for="notes">Paste the resident's notes</label>
+    <textarea id="notes" maxlength="20000" placeholder="Paste case notes here…" spellcheck="true"></textarea>
+    <div class="row">
+      <button id="rewriteButton" class="primary" type="button" disabled>Draft letter</button>
+      <button id="clearButton" type="button">Clear notes and results</button>
+    </div>
+    <p id="draftStatus" class="status" role="status" aria-live="polite"></p>
+  </section>
 
-    <label for="notes">Case notes</label>
-    <textarea
-      id="notes"
-      placeholder="Paste case notes here..."
-      spellcheck="true"
-    ></textarea>
+  <section id="resultsPanel" class="panel hidden" aria-labelledby="resultsHeading">
+    <h2 id="resultsHeading">Draft results</h2>
+    <p id="elapsedTime" class="connected" aria-live="polite"></p>
+    <div class="output-heading"><label for="letterOutput">LETTER</label><button type="button" data-copy="letterOutput">Copy letter</button></div>
+    <textarea id="letterOutput" class="output" spellcheck="true" placeholder="Letter will appear here…"></textarea>
+    <details id="verifyDetails" open>
+      <summary>WRITER TO VERIFY</summary>
+      <p class="note">Questions for the writer to check before submission. These are separate from the petition letter.</p>
+      <div class="output-heading"><label for="verifyOutput">Verification questions</label><button type="button" data-copy="verifyOutput">Copy questions</button></div>
+      <textarea id="verifyOutput" class="output" spellcheck="true" placeholder="No verification questions were returned."></textarea>
+    </details>
+    <div class="row">
+      <button id="copyAllButton" type="button">Copy both sections</button>
+    </div>
+  </section>
+  <footer>Keep resident information within approved systems. Generated drafts are suggestions and require human review.</footer>
+</main>
+<script>
+  // If your Cloudflare Quick Tunnel URL changes, update this one line.
+  const API_BASE = "https://expires-wild-kelly-respectively.trycloudflare.com";
+  let accessKey = "";
+  let isConnected = false;
+  let statusTimer = null;
 
-    <button id="rewriteButton" onclick="rewriteNotes()">Rewrite</button>
-    <div id="status" role="status" aria-live="polite"></div>
+  const $ = (id) => document.getElementById(id);
 
-    <label for="result">Draft</label>
-    <textarea
-      id="result"
-      readonly
-      placeholder="The rewritten draft will appear here..."
-      spellcheck="false"
-    ></textarea>
+  function setStatus(id, message, kind = "") {
+    const el = $(id);
+    el.textContent = message;
+    el.className = "status" + (kind ? " " + kind : "");
+  }
 
-    <button class="secondary" id="copyButton" onclick="copyDraft()" disabled>
-      Copy draft
-    </button>
-  </div>
-
-  <script>
-    // This Quick Tunnel URL is temporary. Update it if the tunnel changes.
-    const API_URL =
-      "https://expires-wild-kelly-respectively.trycloudflare.com/api/rewrite";
-
-    async function rewriteNotes() {
-      const key = document.getElementById("apiKey").value.trim();
-      const notes = document.getElementById("notes").value.trim();
-      const button = document.getElementById("rewriteButton");
-      const status = document.getElementById("status");
-      const result = document.getElementById("result");
-      const copyButton = document.getElementById("copyButton");
-
-      if (!key) {
-        status.textContent = "Enter your access key.";
-        return;
-      }
-
-      if (!notes) {
-        status.textContent = "Enter case notes first.";
-        return;
-      }
-
-      button.disabled = true;
-      copyButton.disabled = true;
-      result.value = "";
-      status.textContent = "Rewriting. This may take a little while...";
-
-      try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-MPS-Key": key
-          },
-          body: JSON.stringify({ text: notes })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("Access key rejected. Check your key.");
-          }
-          throw new Error(data.detail || `Request failed (${response.status}).`);
-        }
-
-        result.value = data.result || "";
-        if (!result.value) {
-          throw new Error("The model returned an empty draft.");
-        }
-
-        copyButton.disabled = false;
-        status.textContent = "Draft ready. Check it carefully before use.";
-      } catch (error) {
-        status.textContent =
-          "Could not rewrite: " + error.message +
-          ". Check that your PC, API and tunnel are running.";
-      } finally {
-        button.disabled = false;
-      }
+  async function apiRequest(path, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    if (accessKey) headers["X-MPS-Key"] = accessKey;
+    if (options.body) headers["Content-Type"] = "application/json";
+    const response = await fetch(API_BASE + path, { ...options, headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) throw new Error("Access key rejected. Check it and try again.");
+      throw new Error(data.detail || `Request failed (${response.status}).`);
     }
+    return data;
+  }
 
-    async function copyDraft() {
-      const result = document.getElementById("result");
-      const status = document.getElementById("status");
-
-      try {
-        await navigator.clipboard.writeText(result.value);
-        status.textContent = "Draft copied.";
-      } catch {
-        result.focus();
-        result.select();
-        status.textContent = "Select and copy the draft manually.";
-      }
+  async function connect() {
+    const enteredKey = $("apiKey").value.trim();
+    if (!enteredKey) {
+      setStatus("connectionStatus", "Enter your access key first.", "error");
+      return;
     }
-  </script>
+    const button = $("connectButton");
+    button.disabled = true;
+    button.textContent = "Connecting…";
+    accessKey = enteredKey;
+    try {
+      await apiRequest("/api/connect", { method: "POST" });
+      isConnected = true;
+      $("apiKey").value = "";
+      $("disconnectedView").classList.add("hidden");
+      $("connectedView").classList.remove("hidden");
+      $("rewriteButton").disabled = false;
+      $("refreshStatusButton").disabled = false;
+      $("apiMetric").textContent = "Connected";
+      setStatus("connectionStatus", "Connection established.", "success");
+      await refreshSystemStatus();
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(() => { if (isConnected) refreshSystemStatus(); }, 30000);
+    } catch (error) {
+      accessKey = "";
+      isConnected = false;
+      $("apiMetric").textContent = "Connection failed";
+      setStatus("connectionStatus", error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Connect";
+    }
+  }
+
+  function disconnect() {
+    isConnected = false;
+    accessKey = "";
+    if (statusTimer) clearInterval(statusTimer);
+    statusTimer = null;
+    $("disconnectedView").classList.remove("hidden");
+    $("connectedView").classList.add("hidden");
+    $("rewriteButton").disabled = true;
+    $("refreshStatusButton").disabled = true;
+    $("apiMetric").textContent = "Not connected";
+    $("configuredModel").textContent = "—";
+    $("loadedModel").textContent = "—";
+    $("gpuUtil").textContent = "—";
+    $("gpuMemory").textContent = "—";
+    $("gpuTemp").textContent = "—";
+    $("gpuUtilBar").style.width = "0";
+    $("gpuMemoryBar").style.width = "0";
+    $("systemNote").textContent = "Connect to view authenticated system information.";
+    $("lastStatusUpdate").textContent = "Last status update: never";
+    setStatus("connectionStatus", "Disconnected. The key has been cleared from page memory.");
+  }
+
+  async function refreshSystemStatus() {
+    if (!isConnected) return;
+    const button = $("refreshStatusButton");
+    button.disabled = true;
+    try {
+      const data = await apiRequest("/api/status", { method: "GET" });
+      $("apiMetric").textContent = data.ollama_reachable ? "API and Ollama online" : "API online; Ollama unavailable";
+      $("configuredModel").textContent = data.model_configured || "Unknown";
+      const loaded = Array.isArray(data.loaded_models) ? data.loaded_models : [];
+      if (!loaded.length) {
+        $("loadedModel").textContent = "No model currently loaded";
+      } else {
+        $("loadedModel").textContent = loaded.map(m => {
+          const vram = Number.isFinite(m.size_vram_bytes) ? ` (${(m.size_vram_bytes / (1024 ** 3)).toFixed(1)} GiB VRAM)` : "";
+          return (m.name || "Unknown") + vram;
+        }).join("; ");
+      }
+      if (data.gpu) {
+        const gpu = data.gpu;
+        $("gpuUtil").textContent = `${gpu.utilization_percent}% · ${gpu.name}`;
+        $("gpuUtilBar").style.width = `${Math.max(0, Math.min(100, gpu.utilization_percent))}%`;
+        $("gpuMemory").textContent = `${gpu.memory_used_mb} / ${gpu.memory_total_mb} MB`;
+        $("gpuMemoryBar").style.width = `${Math.max(0, Math.min(100, gpu.memory_used_mb / gpu.memory_total_mb * 100))}%`;
+        $("gpuTemp").textContent = `${gpu.temperature_c} °C`;
+      } else {
+        $("gpuUtil").textContent = "Unavailable";
+        $("gpuMemory").textContent = "Unavailable";
+        $("gpuTemp").textContent = "Unavailable";
+        $("gpuUtilBar").style.width = "0";
+        $("gpuMemoryBar").style.width = "0";
+      }
+      const notes = [data.ollama_note, data.gpu_note].filter(Boolean);
+      $("systemNote").textContent = notes.length ? notes.join(" ") : `Host: ${data.platform || "unknown"} · Python ${data.python_version || "unknown"}. GPU/model readings are host-side snapshots.`;
+      $("lastStatusUpdate").textContent = `Last status update: ${new Date().toLocaleString()}`;
+    } catch (error) {
+      $("apiMetric").textContent = "Status unavailable";
+      $("systemNote").textContent = error.message;
+      $("lastStatusUpdate").textContent = `Last status update failed: ${new Date().toLocaleString()}`;
+      if (error.message.includes("Access key rejected")) disconnect();
+    } finally {
+      button.disabled = !isConnected;
+    }
+  }
+
+  function splitResult(raw) {
+    const normalized = raw.replace(/\r\n/g, "\n").trim();
+    const letterMatch = normalized.match(/(?:^|\n)LETTER\s*\n/i);
+    if (!letterMatch) return { letter: normalized, verify: "" };
+    const letterStart = letterMatch.index + letterMatch[0].length;
+    const rest = normalized.slice(letterStart);
+    const verifyMatch = rest.match(/\n\s*WRITER TO VERIFY\s*\n?/i);
+    if (!verifyMatch) return { letter: rest.trim(), verify: "" };
+    return {
+      letter: rest.slice(0, verifyMatch.index).trim(),
+      verify: rest.slice(verifyMatch.index + verifyMatch[0].length).trim()
+    };
+  }
+
+  async function rewriteNotes() {
+    if (!isConnected) {
+      setStatus("draftStatus", "Connect before drafting.", "error");
+      return;
+    }
+    const notes = $("notes").value.trim();
+    if (!notes) {
+      setStatus("draftStatus", "Enter case notes first.", "error");
+      return;
+    }
+    const button = $("rewriteButton");
+    button.disabled = true;
+    button.textContent = "Drafting…";
+    $("resultsPanel").classList.add("hidden");
+    $("letterOutput").value = "";
+    $("verifyOutput").value = "";
+    $("elapsedTime").textContent = "";
+    setStatus("draftStatus", "Drafting with the three-stage local workflow. This may take a little while…");
+    const startedAt = performance.now();
+    try {
+      const data = await apiRequest("/api/rewrite", {
+        method: "POST",
+        body: JSON.stringify({ text: notes })
+      });
+      const elapsed = (performance.now() - startedAt) / 1000;
+      if (!data.result || !data.result.trim()) throw new Error("The model returned an empty draft.");
+      const parts = splitResult(data.result);
+      $("letterOutput").value = parts.letter;
+      $("verifyOutput").value = parts.verify;
+      $("verifyDetails").classList.toggle("hidden", !parts.verify);
+      $("resultsPanel").classList.remove("hidden");
+      $("elapsedTime").textContent = `Draft complete in ${elapsed.toFixed(1)} seconds`;
+      setStatus("draftStatus", "Draft complete. Check the letter and verification questions carefully before use.", "success");
+      $("resultsPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      setStatus("draftStatus", `Could not draft: ${error.message} Check that your PC, Ollama, API and tunnel are running.`, "error");
+      if (error.message.includes("Access key rejected")) disconnect();
+    } finally {
+      button.disabled = !isConnected;
+      button.textContent = "Draft letter";
+    }
+  }
+
+  async function copyField(id) {
+    const field = $(id);
+    try {
+      await navigator.clipboard.writeText(field.value);
+      setStatus("draftStatus", `${id === "letterOutput" ? "Letter" : "Verification questions"} copied.`, "success");
+    } catch {
+      field.focus();
+      field.select();
+      setStatus("draftStatus", "Clipboard access failed. The text is selected; copy it manually.", "error");
+    }
+  }
+
+  async function copyBoth() {
+    const letter = $("letterOutput").value.trim();
+    const verify = $("verifyOutput").value.trim();
+    const combined = `LETTER\n\n${letter}${verify ? `\n\nWRITER TO VERIFY\n\n${verify}` : ""}`;
+    try {
+      await navigator.clipboard.writeText(combined);
+      setStatus("draftStatus", "Both sections copied.", "success");
+    } catch {
+      setStatus("draftStatus", "Clipboard access failed. Use the separate copy buttons.", "error");
+    }
+  }
+
+  $("connectButton").addEventListener("click", connect);
+  $("apiKey").addEventListener("keydown", event => { if (event.key === "Enter") connect(); });
+  $("disconnectButton").addEventListener("click", disconnect);
+  $("refreshStatusButton").addEventListener("click", refreshSystemStatus);
+  $("rewriteButton").addEventListener("click", rewriteNotes);
+  $("clearButton").addEventListener("click", () => {
+    $("notes").value = "";
+    $("letterOutput").value = "";
+    $("verifyOutput").value = "";
+    $("resultsPanel").classList.add("hidden");
+    $("elapsedTime").textContent = "";
+    setStatus("draftStatus", "Case notes and results cleared.");
+  });
+  document.querySelectorAll("[data-copy]").forEach(button => {
+    button.addEventListener("click", () => copyField(button.dataset.copy));
+  });
+  $("copyAllButton").addEventListener("click", copyBoth);
+</script>
 </body>
 </html>
