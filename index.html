@@ -197,11 +197,40 @@
     const headers = { ...(options.headers || {}) };
     if (accessKey) headers["X-MPS-Key"] = accessKey;
     if (options.body) headers["Content-Type"] = "application/json";
-    const response = await fetch(API_BASE + path, { ...options, headers });
+
+    let response;
+    try {
+      response = await fetch(API_BASE + path, { ...options, headers });
+    } catch (cause) {
+      const error = new Error(
+        `Browser received no HTTP response from the API (${cause && cause.name ? cause.name : "fetch error"}). ` +
+        "Possible causes include a failed browser preflight/CORS check, an expired tunnel URL, or a network connection problem."
+      );
+      error.kind = "network";
+      error.cause = cause;
+      throw error;
+    }
+
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 401) throw new Error("Access key rejected. Check it and try again.");
-      throw new Error(data.detail || `Request failed (${response.status}).`);
+      const detail = data.detail;
+      let message;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (detail && typeof detail === "object") {
+        const parts = [];
+        if (detail.message) parts.push(detail.message);
+        if (detail.stage) parts.push(`stage=${detail.stage}`);
+        if (detail.code) parts.push(`code=${detail.code}`);
+        if (detail.request_id) parts.push(`request=${detail.request_id}`);
+        message = parts.join(" · ");
+      }
+      const error = new Error(message || `Request failed with HTTP ${response.status}.`);
+      error.kind = "http";
+      error.httpStatus = response.status;
+      error.detail = detail;
+      throw error;
     }
     return data;
   }
@@ -337,27 +366,91 @@
     $("letterOutput").value = "";
     $("verifyOutput").value = "";
     $("elapsedTime").textContent = "";
-    setStatus("draftStatus", "Drafting with the three-stage local workflow. This may take a little while…");
+
+    const requestId = (window.crypto && typeof window.crypto.randomUUID === "function")
+      ? window.crypto.randomUUID()
+      : `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const startedAt = performance.now();
+    let lastProgressState = "not_seen";
+    let backendSeen = false;
+    let progressPollBusy = false;
+    let noBackendWarningShown = false;
+    let progressTimer = null;
+
+    const pollProgress = async () => {
+      if (progressPollBusy) return;
+      progressPollBusy = true;
+      try {
+        const progress = await apiRequest(`/api/progress/${encodeURIComponent(requestId)}`, { method: "GET" });
+        lastProgressState = progress.state || "unknown";
+        const elapsed = Math.max(0, Math.round((performance.now() - startedAt) / 1000));
+        if (progress.state !== "not_seen") backendSeen = true;
+
+        if (progress.state === "not_seen") {
+          if (elapsed >= 8) {
+            noBackendWarningShown = true;
+            setStatus(
+              "draftStatus",
+              `No rewrite request has reached the backend after ${elapsed}s. This is before model generation. Check whether Uvicorn logs OPTIONS /api/rewrite or POST /api/rewrite; if neither appears, investigate the browser request, CORS/preflight, and active tunnel URL. Request ID: ${requestId}`,
+              "error"
+            );
+          } else {
+            setStatus("draftStatus", `Sending request to the local backend… ${elapsed}s elapsed. Request ID: ${requestId}`);
+          }
+        } else if (progress.state === "running") {
+          setStatus(
+            "draftStatus",
+            `${progress.stage_label || progress.stage || "Processing"} · ${progress.elapsed_seconds ?? elapsed}s elapsed. Request ID: ${requestId}`
+          );
+        } else if (progress.state === "failed") {
+          setStatus(
+            "draftStatus",
+            `Backend reports failure at ${progress.stage_label || progress.stage}: ${progress.message || "No further details"} ` +
+            `(code=${progress.error_code || "unknown"}; request=${requestId}).`,
+            "error"
+          );
+        } else if (progress.state === "complete") {
+          setStatus("draftStatus", `All backend stages completed; waiting for the result response… Request ID: ${requestId}`);
+        }
+      } catch (error) {
+        // Keep the main rewrite request in control. If progress polling itself fails,
+        // the catch below will still report the rewrite request's actual outcome.
+      } finally {
+        progressPollBusy = false;
+      }
+    };
+
+    setStatus("draftStatus", `Sending request to the local backend… Request ID: ${requestId}`);
+    await pollProgress();
+    progressTimer = setInterval(pollProgress, 1800);
+
     try {
       const data = await apiRequest("/api/rewrite", {
         method: "POST",
+        headers: { "X-Request-ID": requestId },
         body: JSON.stringify({ text: notes })
       });
       const elapsed = (performance.now() - startedAt) / 1000;
-      if (!data.result || !data.result.trim()) throw new Error("The model returned an empty draft.");
+      if (!data.result || !data.result.trim()) throw new Error(`The backend returned an empty draft. Request ID: ${requestId}`);
       const parts = splitResult(data.result);
       $("letterOutput").value = parts.letter;
       $("verifyOutput").value = parts.verify;
       $("verifyDetails").classList.toggle("hidden", !parts.verify);
       $("resultsPanel").classList.remove("hidden");
-      $("elapsedTime").textContent = `Draft complete in ${elapsed.toFixed(1)} seconds`;
+      $("elapsedTime").textContent = `Draft complete in ${elapsed.toFixed(1)} seconds · Request ID: ${data.request_id || requestId}`;
       setStatus("draftStatus", "Draft complete. Check the letter and verification questions carefully before use.", "success");
       $("resultsPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
-      setStatus("draftStatus", `Could not draft: ${error.message} Check that your PC, Ollama, API and tunnel are running.`, "error");
+      let diagnosis = "";
+      if (error.kind === "network" && !backendSeen && lastProgressState === "not_seen") {
+        diagnosis = " The progress check also found no matching request at the backend, so this failure appears to be before model generation. Check the API tunnel URL and browser Network/Console errors; Uvicorn should normally show OPTIONS /api/rewrite and POST /api/rewrite when the request arrives.";
+      } else if (error.kind === "network" && backendSeen) {
+        diagnosis = " The backend did register this request. Check the Uvicorn log for the same request ID to see whether processing continued after the browser stopped receiving the response.";
+      }
+      setStatus("draftStatus", `Could not draft: ${error.message}${diagnosis} Request ID: ${requestId}`, "error");
       if (error.message.includes("Access key rejected")) disconnect();
     } finally {
+      if (progressTimer) clearInterval(progressTimer);
       button.disabled = !isConnected;
       button.textContent = "Draft letter";
     }
