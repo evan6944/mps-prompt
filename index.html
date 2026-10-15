@@ -1,502 +1,568 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en-SG">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="referrer" content="no-referrer">
-  <title>MPS Rewriter</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>MPS Drafter</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --page: #f2f4f7;
-      --surface: #ffffff;
-      --surface-soft: #f8fafc;
-      --text: #17202b;
-      --muted: #5d6877;
-      --border: #d8dee7;
-      --primary: #26384a;
-      --primary-hover: #344b62;
-      --success: #176b43;
-      --danger: #a52b2b;
-      --radius: 12px;
+      --page: #f2f4f7; --surface: #ffffff; --surface-soft: #f8fafc; --text: #17202b; --muted: #5d6877;
+      --border: #d8dee7; --primary: #26384a; --on-primary: #ffffff; --success: #176b43; --danger: #a52b2b;
+      --mark: #fff1c2; --mark-text: #5a4300; --radius: 12px;
     }
     @media (prefers-color-scheme: dark) {
-      :root {
-        --page: #11161d;
-        --surface: #1b232d;
-        --surface-soft: #151c24;
-        --text: #edf2f7;
-        --muted: #b0bac7;
-        --border: #394553;
-        --primary: #dce8f5;
-        --primary-hover: #ffffff;
-        --success: #7bd6a4;
-        --danger: #ff9999;
+      :root:not([data-theme="light"]) {
+        --page: #11161d; --surface: #1b232d; --surface-soft: #151c24; --text: #edf2f7; --muted: #b0bac7;
+        --border: #394553; --primary: #dce8f5; --on-primary: #17202b; --success: #7bd6a4; --danger: #ff9999;
+        --mark: #4a3b0f; --mark-text: #ffe7a3;
       }
-      button.primary { color: #17202b; }
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 28px 16px 48px;
-      background: var(--page);
-      color: var(--text);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.5;
-    }
+    body { margin: 0; padding: 24px 16px 48px; background: var(--page); color: var(--text);
+           font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
     main { width: 100%; max-width: 1000px; margin: 0 auto; }
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: clamp(18px, 3vw, 30px);
-      margin-bottom: 18px;
-    }
-    h1 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 0 0 6px; }
-    h2 { font-size: 1.12rem; margin: 0 0 12px; }
-    p { margin: 8px 0 14px; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+             padding: clamp(16px, 3vw, 28px); margin-bottom: 16px; }
+    h1 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 0 0 4px; }
+    h2 { font-size: 1.12rem; margin: 0 0 10px; }
+    h3 { font-size: 1rem; margin: 18px 0 6px; }
+    p { margin: 6px 0 12px; }
     .muted, .note { color: var(--muted); font-size: .9rem; }
-    label { display: block; font-weight: 700; margin: 16px 0 7px; }
-    input, textarea {
-      width: 100%;
-      color: var(--text);
-      background: var(--surface-soft);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      font: inherit;
-    }
-    input { min-height: 44px; }
+    label { display: block; font-weight: 700; margin: 14px 0 6px; }
+    input, textarea, select { width: 100%; color: var(--text); background: var(--surface-soft);
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: inherit; }
+    input, select { min-height: 42px; }
     textarea { resize: vertical; line-height: 1.55; }
-    #notes { min-height: 260px; }
-    .output { min-height: 220px; }
-    button {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 15px;
-      margin: 10px 8px 0 0;
-      background: var(--surface-soft);
-      color: var(--text);
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    button.primary { background: var(--primary); color: #fff; border-color: transparent; }
-    button.primary:hover { opacity: .88; }
+    #notes, #answers { min-height: 220px; }
+    .output { min-height: 260px; }
+    .verify { min-height: 150px; }
+    button { border: 1px solid var(--border); border-radius: 8px; padding: 10px 15px; background: var(--surface-soft);
+             color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+    button.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+    button.small { padding: 6px 10px; font-size: .88rem; }
     button:disabled { opacity: .48; cursor: wait; }
-    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .row button { margin-right: 0; }
-    .status { min-height: 1.5em; margin: 12px 0 0; overflow-wrap: anywhere; }
-    .status.error { color: var(--danger); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+    .between { justify-content: space-between; }
+    .status { min-height: 1.5em; margin: 10px 0 0; overflow-wrap: anywhere; }
+    .status.error { color: var(--danger); font-weight: 600; }
     .status.success { color: var(--success); }
     .hidden { display: none !important; }
-    .connection-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
     .connected { color: var(--success); font-weight: 700; }
-    .system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
-    .metric { padding: 12px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; min-width: 0; }
-    .metric-label { color: var(--muted); font-size: .82rem; margin-bottom: 4px; }
-    .metric-value { font-weight: 700; overflow-wrap: anywhere; }
-    .meter { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 8px; }
-    .meter-fill { height: 100%; width: 0; background: #4a9b74; transition: width .2s ease; }
-    details summary { cursor: pointer; font-weight: 700; }
-    .output-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-    .output-heading label { margin: 16px 0 7px; }
+    .step { display: inline-block; min-width: 1.6em; padding: 0 6px; margin-right: 6px; border-radius: 999px;
+            background: var(--primary); color: var(--on-primary); text-align: center; font-size: .85rem; }
+    /* hide list */
+    .items { display: grid; gap: 8px; margin-top: 8px; }
+    .item { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 110px minmax(0, 1.3fr) auto;
+            gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 9px;
+            background: var(--surface-soft); }
+    .item.resident { border-color: var(--primary); border-width: 2px; }
+    .item .orig { font-weight: 700; overflow-wrap: anywhere; }
+    .item .kind { color: var(--muted); font-size: .8rem; font-weight: 400; display: block; }
+    .item input, .item select { min-height: 36px; padding: 6px 8px; }
+    .item-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 110px minmax(0, 1.3fr) auto;
+                 gap: 8px; padding: 0 9px; color: var(--muted); font-size: .8rem; }
+    .preview { white-space: pre-wrap; font-family: Consolas, Menlo, monospace; font-size: .9rem; padding: 12px;
+               background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px;
+               max-height: 320px; overflow: auto; overflow-wrap: anywhere; }
+    .preview mark { background: var(--mark); color: var(--mark-text); border-radius: 4px; padding: 0 2px; }
+    .add { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; margin-top: 10px; }
+    .letter-block { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 12px; }
+    .recipient { font-weight: 700; font-size: 1.05rem; }
+    details summary { cursor: pointer; font-weight: 700; margin-top: 12px; }
+    .case-list { display: grid; gap: 6px; margin-top: 8px; max-height: 360px; overflow: auto; }
+    .case-list button { text-align: left; font-weight: 400; width: 100%; }
+    .case-list .when { color: var(--muted); font-size: .85rem; margin-right: 8px; }
     footer { color: var(--muted); font-size: .82rem; padding: 0 4px; }
-    @media (max-width: 560px) {
-      body { padding: 14px 10px 30px; }
-      .panel { padding: 16px; }
-      #notes { min-height: 220px; }
-      .output { min-height: 190px; }
+    @media (max-width: 720px) {
+      body { padding: 12px 12px 30px; }
+      .item, .item-head { grid-template-columns: 1fr 1fr; }
+      .item-head { display: none; }
+      .item .orig { grid-column: 1 / -1; }
+      .add { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 <main>
   <header class="panel">
-    <h1>MPS Rewriter</h1>
-    <p class="muted">Draft petition letters using the local model on your PC. Review all generated text before use.</p>
-    <div id="disconnectedView">
-      <label for="apiKey">Access key</label>
-      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your MPS access key">
-      <div class="row">
-        <button id="connectButton" class="primary" type="button">Connect</button>
-      </div>
-      <p class="note">The access key is kept in this page's memory only. It is not saved to browser storage. Refreshing the page disconnects it.</p>
+    <h1>MPS Drafter</h1>
+    <p class="muted">Names and identifying details are hidden on the home PC before anything is sent to the online AI. Always read the letter before use.</p>
+    <div id="loginView">
+      <label for="accessKey">Access key</label>
+      <input id="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your MPS access key">
+      <div class="row"><button id="connectButton" class="primary" type="button">Connect</button></div>
+      <p class="note">The key is kept in this page's memory only. Refreshing the page logs you out.</p>
     </div>
-    <div id="connectedView" class="hidden">
-      <div class="connection-line">
-        <span class="connected">Connected and authenticated</span>
-        <button id="disconnectButton" type="button">Disconnect</button>
+    <div id="loggedInView" class="hidden">
+      <div class="row between">
+        <span class="connected">Connected to the home PC</span>
+        <span id="modelName" class="note"></span>
+        <button id="logoutButton" type="button" class="small">Log out</button>
       </div>
-      <p class="note">Your access key is hidden. Disconnect or refresh the page to clear it from this page's memory.</p>
     </div>
-    <p id="connectionStatus" class="status" role="status" aria-live="polite"></p>
+    <p id="connectStatus" class="status" role="status" aria-live="polite"></p>
   </header>
 
-  <section class="panel" aria-labelledby="systemHeading">
-    <div class="connection-line">
-      <h2 id="systemHeading">System status</h2>
-      <button id="refreshStatusButton" type="button" disabled>Refresh status</button>
-    </div>
-    <div class="system-grid">
-      <div class="metric"><div class="metric-label">API connection</div><div id="apiMetric" class="metric-value">Not connected</div></div>
-      <div class="metric"><div class="metric-label">Configured model</div><div id="configuredModel" class="metric-value">—</div></div>
-      <div class="metric"><div class="metric-label">Loaded Ollama model</div><div id="loadedModel" class="metric-value">—</div></div>
-      <div class="metric"><div class="metric-label">GPU utilisation</div><div id="gpuUtil" class="metric-value">—</div><div class="meter"><div id="gpuUtilBar" class="meter-fill"></div></div></div>
-      <div class="metric"><div class="metric-label">GPU memory</div><div id="gpuMemory" class="metric-value">—</div><div class="meter"><div id="gpuMemoryBar" class="meter-fill"></div></div></div>
-      <div class="metric"><div class="metric-label">GPU temperature</div><div id="gpuTemp" class="metric-value">—</div></div>
-    </div>
-    <p id="systemNote" class="note">Connect to view authenticated system information. GPU readings require NVIDIA's nvidia-smi utility to be accessible on the host PC.</p>
-    <p id="lastStatusUpdate" class="note">Last status update: never</p>
-  </section>
+  <div id="app" class="hidden">
+    <!-- STEP 1: notes -->
+    <section class="panel" id="notesPanel">
+      <div class="row between">
+        <h2><span class="step">1</span>Case notes</h2>
+        <button id="newCaseButton" type="button" class="small">New case</button>
+      </div>
+      <label for="notes">Paste or type the notes</label>
+      <textarea id="notes" maxlength="20000" spellcheck="true" placeholder="resident = mr tan ah kow&#10;..."></textarea>
+      <div class="row"><button id="checkButton" class="primary" type="button">Check names before sending</button></div>
+      <p id="notesStatus" class="status" role="status" aria-live="polite"></p>
+    </section>
 
-  <section class="panel" aria-labelledby="inputHeading">
-    <h2 id="inputHeading">Case notes</h2>
-    <label for="notes">Paste the resident's notes</label>
-    <textarea id="notes" maxlength="20000" placeholder="Paste case notes here…" spellcheck="true"></textarea>
-    <div class="row">
-      <button id="rewriteButton" class="primary" type="button" disabled>Draft letter</button>
-      <button id="clearButton" type="button">Clear notes and results</button>
-    </div>
-    <p id="draftStatus" class="status" role="status" aria-live="polite"></p>
-  </section>
+    <!-- STEP 2: approve what is hidden -->
+    <section class="panel hidden" id="hidePanel">
+      <h2><span class="step">2</span>Check what will be hidden</h2>
+      <p class="note">Everything in this list is replaced by its label before sending. Fix anything that is wrong, remove anything that should stay, and add anything that was missed. The resident must have a title.</p>
+      <div class="item-head"><span>In the notes</span><span>Label</span><span>He / she</span><span>Name in the letter</span><span></span></div>
+      <div id="itemsList" class="items"></div>
+      <div class="add">
+        <input id="addText" placeholder="Something else to hide, exactly as written in the notes">
+        <select id="addKind">
+          <option value="person">Person</option>
+          <option value="ADDRESS">Address</option>
+          <option value="SCHOOL">School</option>
+          <option value="WORKPLACE">Workplace / company</option>
+          <option value="CLINIC">Clinic / hospital</option>
+          <option value="NUMBER">Number (NRIC, phone...)</option>
+          <option value="OTHER">Other</option>
+        </select>
+        <button id="addButton" type="button">Add</button>
+      </div>
+      <h3>Exactly what will be sent</h3>
+      <div id="preview" class="preview" aria-live="polite"></div>
+      <div class="row">
+        <button id="sendButton" class="primary" type="button">Send and draft</button>
+        <button id="backButton" type="button">Back to notes</button>
+      </div>
+      <p id="sendStatus" class="status" role="status" aria-live="polite"></p>
+    </section>
 
-  <section id="resultsPanel" class="panel hidden" aria-labelledby="resultsHeading">
-    <h2 id="resultsHeading">Draft results</h2>
-    <p id="elapsedTime" class="connected" aria-live="polite"></p>
-    <div class="output-heading"><label for="letterOutput">LETTER</label><button type="button" data-copy="letterOutput">Copy letter</button></div>
-    <textarea id="letterOutput" class="output" spellcheck="true" placeholder="Letter will appear here…"></textarea>
-    <details id="verifyDetails" open>
-      <summary>WRITER TO VERIFY</summary>
-      <p class="note">Questions for the writer to check before submission. These are separate from the petition letter.</p>
-      <div class="output-heading"><label for="verifyOutput">Verification questions</label><button type="button" data-copy="verifyOutput">Copy questions</button></div>
-      <textarea id="verifyOutput" class="output" spellcheck="true" placeholder="No verification questions were returned."></textarea>
-    </details>
-    <div class="row">
-      <button id="copyAllButton" type="button">Copy both sections</button>
-    </div>
-  </section>
-  <footer>Keep resident information within approved systems. Generated drafts are suggestions and require human review.</footer>
+    <!-- STEP 3: results -->
+    <section class="panel hidden" id="resultPanel">
+      <div class="row between">
+        <h2><span class="step">3</span><span id="resultTitle">Draft</span></h2>
+        <span id="resultInfo" class="note"></span>
+      </div>
+      <div id="letters"></div>
+      <details id="judgementsBox">
+        <summary>How the AI read the notes</summary>
+        <p class="note">The AI's own notes on the tricky points. Not part of the letter.</p>
+        <div id="judgements" class="preview"></div>
+      </details>
+
+      <h3>Refine with the resident's answers</h3>
+      <p class="note">Type what the resident told you. It goes through the same name check before sending.</p>
+      <textarea id="answers" maxlength="20000" spellcheck="true" placeholder="e.g. rejection letter dated 12 feb 2026, applied alone..."></textarea>
+      <div class="row"><button id="refineCheckButton" class="primary" type="button">Check names before sending</button></div>
+      <p id="refineStatus" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="panel">
+      <div class="row between">
+        <h2>Saved cases</h2>
+        <button id="refreshCasesButton" type="button" class="small">Refresh</button>
+      </div>
+      <p class="note">Saved on the home PC only. Click a case to open it.</p>
+      <div id="caseList" class="case-list"></div>
+    </section>
+  </div>
+  <footer>Keep resident information within approved systems. Drafts are suggestions and need human review.</footer>
 </main>
+
 <script>
-  // If your Cloudflare Quick Tunnel URL changes, update this one line.
-  const API_BASE = "https://stayed-fever-throughout-dreams.trycloudflare.com";
+  // The home PC's permanent address (Tailscale). This should never need changing.
+  const API_BASE = "https://evan2023.taila99c69.ts.net";
+
   let accessKey = "";
-  let isConnected = false;
-  let statusTimer = null;
+  let items = [];          // what will be hidden
+  let mode = "draft";      // "draft" (new case) or "refine" (answers for currentCase)
+  let currentCase = null;  // case id of the letter on screen
 
   const $ = (id) => document.getElementById(id);
 
-  function setStatus(id, message, kind = "") {
+  function setStatus(id, text, kind) {
     const el = $(id);
-    el.textContent = message;
+    el.textContent = text || "";
     el.className = "status" + (kind ? " " + kind : "");
   }
 
-  async function apiRequest(path, options = {}) {
-    const headers = { ...(options.headers || {}) };
-    if (accessKey) headers["X-MPS-Key"] = accessKey;
-    if (options.body) headers["Content-Type"] = "application/json";
-
+  async function api(path, body, method) {
+    const headers = { "X-MPS-Key": accessKey };
+    if (body) headers["Content-Type"] = "application/json";
     let response;
     try {
-      response = await fetch(API_BASE + path, { ...options, headers });
-    } catch (cause) {
-      const error = new Error(
-        `Browser received no HTTP response from the API (${cause && cause.name ? cause.name : "fetch error"}). ` +
-        "Possible causes include a failed browser preflight/CORS check, an expired tunnel URL, or a network connection problem."
-      );
-      error.kind = "network";
-      error.cause = cause;
-      throw error;
+      response = await fetch(API_BASE + path, { method: method || (body ? "POST" : "GET"), headers, body: body ? JSON.stringify(body) : undefined });
+    } catch (e) {
+      throw new Error("Cannot reach the home PC. Is it switched on with the MPS server running?");
     }
-
-    const data = await response.json().catch(() => ({}));
+    let data = null;
+    try { data = await response.json(); } catch (e) { /* no body */ }
     if (!response.ok) {
-      if (response.status === 401) throw new Error("Access key rejected. Check it and try again.");
-      const detail = data.detail;
-      let message;
-      if (typeof detail === "string") {
-        message = detail;
-      } else if (detail && typeof detail === "object") {
-        const parts = [];
-        if (detail.message) parts.push(detail.message);
-        if (detail.stage) parts.push(`stage=${detail.stage}`);
-        if (detail.code) parts.push(`code=${detail.code}`);
-        if (detail.request_id) parts.push(`request=${detail.request_id}`);
-        message = parts.join(" · ");
-      }
-      const error = new Error(message || `Request failed with HTTP ${response.status}.`);
-      error.kind = "http";
-      error.httpStatus = response.status;
-      error.detail = detail;
-      throw error;
+      const detail = data && data.detail;
+      throw new Error(typeof detail === "string" ? detail : (response.status === 401 ? "Wrong access key." : "The home PC returned an error (" + response.status + ")."));
     }
     return data;
   }
 
-  async function connect() {
-    const enteredKey = $("apiKey").value.trim();
-    if (!enteredKey) {
-      setStatus("connectionStatus", "Enter your access key first.", "error");
-      return;
-    }
-    const button = $("connectButton");
-    button.disabled = true;
-    button.textContent = "Connecting…";
-    accessKey = enteredKey;
+  function withTimer(statusId, label) {
+    const started = Date.now();
+    const tick = () => setStatus(statusId, label + " " + Math.round((Date.now() - started) / 1000) + "s");
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }
+
+  function busy(on) {
+    document.querySelectorAll("#app button").forEach((b) => { b.disabled = on; });
+  }
+
+  // ---------- login ----------
+  $("connectButton").addEventListener("click", async () => {
+    accessKey = $("accessKey").value.trim();
+    if (!accessKey) return setStatus("connectStatus", "Enter the access key.", "error");
+    setStatus("connectStatus", "Connecting...");
     try {
-      await apiRequest("/api/connect", { method: "POST" });
-      isConnected = true;
-      $("apiKey").value = "";
-      $("disconnectedView").classList.add("hidden");
-      $("connectedView").classList.remove("hidden");
-      $("rewriteButton").disabled = false;
-      $("refreshStatusButton").disabled = false;
-      $("apiMetric").textContent = "Connected";
-      setStatus("connectionStatus", "Connection established.", "success");
-      await refreshSystemStatus();
-      if (statusTimer) clearInterval(statusTimer);
-      statusTimer = setInterval(() => { if (isConnected) refreshSystemStatus(); }, 30000);
-    } catch (error) {
+      const data = await api("/api/connect", {});
+      $("accessKey").value = "";
+      $("loginView").classList.add("hidden");
+      $("loggedInView").classList.remove("hidden");
+      $("app").classList.remove("hidden");
+      $("modelName").textContent = "Writing with " + data.model;
+      setStatus("connectStatus", "");
+      loadCases();
+    } catch (e) {
       accessKey = "";
-      isConnected = false;
-      $("apiMetric").textContent = "Connection failed";
-      setStatus("connectionStatus", error.message, "error");
-    } finally {
-      button.disabled = false;
-      button.textContent = "Connect";
+      setStatus("connectStatus", e.message, "error");
     }
+  });
+  $("accessKey").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connectButton").click(); });
+  $("logoutButton").addEventListener("click", () => location.reload());
+
+  // ---------- labels and preview (same rules as the home PC) ----------
+  const TITLES = ["Mr", "Ms", "Mdm"];
+  const stripTitle = (s) => (s || "").replace(/^(Mr|Ms|Mdm|Mrs|Dr)\.?\s+/i, "");
+  const titleOf = (s) => { const m = (s || "").match(/^(Mr|Ms|Mdm|Mrs|Dr)\b/i); return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : ""; };
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  function nextLabel(role) {
+    role = role.toUpperCase().trim() || "OTHER";
+    if (role === "RESIDENT") return "[RESIDENT]";
+    const used = items.map((i) => i.label).filter((l) => l === "[" + role + "]" || l.startsWith("[" + role + " "));
+    if (used.length === 0) return "[" + role + "]";
+    // rename a lone [ROLE] to [ROLE 1] so numbering stays clear
+    items.forEach((i) => { if (i.label === "[" + role + "]") i.label = "[" + role + " 1]"; });
+    return "[" + role + " " + (used.length + 1) + "]";
   }
 
-  function disconnect() {
-    isConnected = false;
-    accessKey = "";
-    if (statusTimer) clearInterval(statusTimer);
-    statusTimer = null;
-    $("disconnectedView").classList.remove("hidden");
-    $("connectedView").classList.add("hidden");
-    $("rewriteButton").disabled = true;
-    $("refreshStatusButton").disabled = true;
-    $("apiMetric").textContent = "Not connected";
-    $("configuredModel").textContent = "—";
-    $("loadedModel").textContent = "—";
-    $("gpuUtil").textContent = "—";
-    $("gpuMemory").textContent = "—";
-    $("gpuTemp").textContent = "—";
-    $("gpuUtilBar").style.width = "0";
-    $("gpuMemoryBar").style.width = "0";
-    $("systemNote").textContent = "Connect to view authenticated system information.";
-    $("lastStatusUpdate").textContent = "Last status update: never";
-    setStatus("connectionStatus", "Disconnected. The key has been cleared from page memory.");
+  function hideText(text) {
+    const ordered = items.filter((i) => i.text).slice().sort((a, b) => b.text.length - a.text.length);
+    if (!ordered.length) return { hidden: text, html: escapeHtml(text) };
+    const lookup = new Map(ordered.map((i) => [i.text.toLowerCase(), i.label]));
+    const pattern = new RegExp(ordered.map((i) =>
+      (/^[a-z0-9]/i.test(i.text) ? "(?<![A-Za-z0-9])" : "") + escapeRe(i.text) + (/[a-z0-9]$/i.test(i.text) ? "(?![A-Za-z0-9])" : "")
+    ).join("|"), "gi");
+    let hidden = "", html = "", last = 0;
+    for (const m of text.matchAll(pattern)) {
+      const label = lookup.get(m[0].toLowerCase()) || "[HIDDEN]";
+      hidden += text.slice(last, m.index) + label;
+      html += escapeHtml(text.slice(last, m.index)) + "<mark>" + escapeHtml(label) + "</mark>";
+      last = m.index + m[0].length;
+    }
+    hidden += text.slice(last);
+    html += escapeHtml(text.slice(last));
+    return { hidden, html };
   }
 
-  async function refreshSystemStatus() {
-    if (!isConnected) return;
-    const button = $("refreshStatusButton");
-    button.disabled = true;
-    try {
-      const data = await apiRequest("/api/status", { method: "GET" });
-      $("apiMetric").textContent = data.ollama_reachable ? "API and Ollama online" : "API online; Ollama unavailable";
-      $("configuredModel").textContent = data.model_configured || "Unknown";
-      const loaded = Array.isArray(data.loaded_models) ? data.loaded_models : [];
-      if (!loaded.length) {
-        $("loadedModel").textContent = "No model currently loaded";
-      } else {
-        $("loadedModel").textContent = loaded.map(m => {
-          const vram = Number.isFinite(m.size_vram_bytes) ? ` (${(m.size_vram_bytes / (1024 ** 3)).toFixed(1)} GiB VRAM)` : "";
-          return (m.name || "Unknown") + vram;
-        }).join("; ");
-      }
-      if (data.gpu) {
-        const gpu = data.gpu;
-        $("gpuUtil").textContent = `${gpu.utilization_percent}% · ${gpu.name}`;
-        $("gpuUtilBar").style.width = `${Math.max(0, Math.min(100, gpu.utilization_percent))}%`;
-        $("gpuMemory").textContent = `${gpu.memory_used_mb} / ${gpu.memory_total_mb} MB`;
-        $("gpuMemoryBar").style.width = `${Math.max(0, Math.min(100, gpu.memory_used_mb / gpu.memory_total_mb * 100))}%`;
-        $("gpuTemp").textContent = `${gpu.temperature_c} °C`;
-      } else {
-        $("gpuUtil").textContent = "Unavailable";
-        $("gpuMemory").textContent = "Unavailable";
-        $("gpuTemp").textContent = "Unavailable";
-        $("gpuUtilBar").style.width = "0";
-        $("gpuMemoryBar").style.width = "0";
-      }
-      const notes = [data.ollama_note, data.gpu_note].filter(Boolean);
-      $("systemNote").textContent = notes.length ? notes.join(" ") : `Host: ${data.platform || "unknown"} · Python ${data.python_version || "unknown"}. GPU/model readings are host-side snapshots.`;
-      $("lastStatusUpdate").textContent = `Last status update: ${new Date().toLocaleString()}`;
-    } catch (error) {
-      $("apiMetric").textContent = "Status unavailable";
-      $("systemNote").textContent = error.message;
-      $("lastStatusUpdate").textContent = `Last status update failed: ${new Date().toLocaleString()}`;
-      if (error.message.includes("Access key rejected")) disconnect();
-    } finally {
-      button.disabled = !isConnected;
-    }
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  function splitResult(raw) {
-    const normalized = raw.replace(/\r\n/g, "\n").trim();
-    const letterMatch = normalized.match(/(?:^|\n)LETTER\s*\n/i);
-    if (!letterMatch) return { letter: normalized, verify: "" };
-    const letterStart = letterMatch.index + letterMatch[0].length;
-    const rest = normalized.slice(letterStart);
-    const verifyMatch = rest.match(/\n\s*WRITER TO VERIFY\s*\n?/i);
-    if (!verifyMatch) return { letter: rest.trim(), verify: "" };
-    return {
-      letter: rest.slice(0, verifyMatch.index).trim(),
-      verify: rest.slice(verifyMatch.index + verifyMatch[0].length).trim()
-    };
+  function sourceText() { return mode === "refine" ? $("answers").value : $("notes").value; }
+
+  function updatePreview() {
+    $("preview").innerHTML = hideText(sourceText()).html;
   }
 
-  async function rewriteNotes() {
-    if (!isConnected) {
-      setStatus("draftStatus", "Connect before drafting.", "error");
-      return;
-    }
-    const notes = $("notes").value.trim();
-    if (!notes) {
-      setStatus("draftStatus", "Enter case notes first.", "error");
-      return;
-    }
-    const button = $("rewriteButton");
-    button.disabled = true;
-    button.textContent = "Drafting…";
-    $("resultsPanel").classList.add("hidden");
-    $("letterOutput").value = "";
-    $("verifyOutput").value = "";
-    $("elapsedTime").textContent = "";
+  function renderItems() {
+    const list = $("itemsList");
+    list.innerHTML = "";
+    items.sort((a, b) => (a.label === "[RESIDENT]" ? -1 : b.label === "[RESIDENT]" ? 1 : 0));
+    items.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.className = "item" + (item.label === "[RESIDENT]" ? " resident" : "");
 
-    const requestId = (window.crypto && typeof window.crypto.randomUUID === "function")
-      ? window.crypto.randomUUID()
-      : `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const startedAt = performance.now();
-    let lastProgressState = "not_seen";
-    let backendSeen = false;
-    let progressPollBusy = false;
-    let noBackendWarningShown = false;
-    let progressTimer = null;
+      const orig = document.createElement("div");
+      orig.className = "orig";
+      orig.textContent = item.text;
+      const kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = item.kind === "person" ? "person" : (item.role || "").toLowerCase();
+      orig.appendChild(kind);
 
-    const pollProgress = async () => {
-      if (progressPollBusy) return;
-      progressPollBusy = true;
-      try {
-        const progress = await apiRequest(`/api/progress/${encodeURIComponent(requestId)}`, { method: "GET" });
-        lastProgressState = progress.state || "unknown";
-        const elapsed = Math.max(0, Math.round((performance.now() - startedAt) / 1000));
-        if (progress.state !== "not_seen") backendSeen = true;
-
-        if (progress.state === "not_seen") {
-          if (elapsed >= 8) {
-            noBackendWarningShown = true;
-            setStatus(
-              "draftStatus",
-              `No rewrite request has reached the backend after ${elapsed}s. This is before model generation. Check whether Uvicorn logs OPTIONS /api/rewrite or POST /api/rewrite; if neither appears, investigate the browser request, CORS/preflight, and active tunnel URL. Request ID: ${requestId}`,
-              "error"
-            );
-          } else {
-            setStatus("draftStatus", `Sending request to the local backend… ${elapsed}s elapsed. Request ID: ${requestId}`);
-          }
-        } else if (progress.state === "running") {
-          setStatus(
-            "draftStatus",
-            `${progress.stage_label || progress.stage || "Processing"} · ${progress.elapsed_seconds ?? elapsed}s elapsed. Request ID: ${requestId}`
-          );
-        } else if (progress.state === "failed") {
-          setStatus(
-            "draftStatus",
-            `Backend reports failure at ${progress.stage_label || progress.stage}: ${progress.message || "No further details"} ` +
-            `(code=${progress.error_code || "unknown"}; request=${requestId}).`,
-            "error"
-          );
-        } else if (progress.state === "complete") {
-          setStatus("draftStatus", `All backend stages completed; waiting for the result response… Request ID: ${requestId}`);
-        }
-      } catch (error) {
-        // Keep the main rewrite request in control. If progress polling itself fails,
-        // the catch below will still report the rewrite request's actual outcome.
-      } finally {
-        progressPollBusy = false;
-      }
-    };
-
-    setStatus("draftStatus", `Sending request to the local backend… Request ID: ${requestId}`);
-    await pollProgress();
-    progressTimer = setInterval(pollProgress, 1800);
-
-    try {
-      const data = await apiRequest("/api/rewrite", {
-        method: "POST",
-        headers: { "X-Request-ID": requestId },
-        body: JSON.stringify({ text: notes })
+      const label = document.createElement("input");
+      label.value = item.label;
+      label.title = "Label sent to the AI";
+      label.addEventListener("change", () => {
+        let v = label.value.trim().toUpperCase().replace(/^\[?|\]?$/g, "");
+        item.label = v ? "[" + v + "]" : nextLabel("OTHER");
+        if (item.label === "[RESIDENT]" && !titleOf(item.display)) item.gender = "";
+        renderItems();
       });
-      const elapsed = (performance.now() - startedAt) / 1000;
-      if (!data.result || !data.result.trim()) throw new Error(`The backend returned an empty draft. Request ID: ${requestId}`);
-      const parts = splitResult(data.result);
-      $("letterOutput").value = parts.letter;
-      $("verifyOutput").value = parts.verify;
-      $("verifyDetails").classList.toggle("hidden", !parts.verify);
-      $("resultsPanel").classList.remove("hidden");
-      $("elapsedTime").textContent = `Draft complete in ${elapsed.toFixed(1)} seconds · Request ID: ${data.request_id || requestId}`;
-      setStatus("draftStatus", "Draft complete. Check the letter and verification questions carefully before use.", "success");
-      $("resultsPanel").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (error) {
-      let diagnosis = "";
-      if (error.kind === "network" && !backendSeen && lastProgressState === "not_seen") {
-        diagnosis = " The progress check also found no matching request at the backend, so this failure appears to be before model generation. Check the API tunnel URL and browser Network/Console errors; Uvicorn should normally show OPTIONS /api/rewrite and POST /api/rewrite when the request arrives.";
-      } else if (error.kind === "network" && backendSeen) {
-        diagnosis = " The backend did register this request. Check the Uvicorn log for the same request ID to see whether processing continued after the browser stopped receiving the response.";
+
+      let genderBox;
+      if (item.kind === "person") {
+        genderBox = document.createElement("select");
+        if (item.label === "[RESIDENT]") {
+          // The resident must have a title: Mr / Ms / Mdm.
+          const current = titleOf(item.display);
+          genderBox.innerHTML = '<option value="">Title?</option>' + TITLES.map((t) => `<option ${t === current ? "selected" : ""}>${t}</option>`).join("");
+          genderBox.addEventListener("change", () => {
+            const t = genderBox.value;
+            item.display = t ? t + " " + stripTitle(item.display) : stripTitle(item.display);
+            item.short = t ? t + " " + stripTitle(item.short || item.display) : stripTitle(item.short || "");
+            item.gender = t === "Mr" ? "he" : t ? "she" : "";
+            renderItems();
+          });
+        } else {
+          genderBox.innerHTML = ["unknown", "he", "she"].map((g) => `<option ${g === item.gender ? "selected" : ""}>${g}</option>`).join("");
+          genderBox.addEventListener("change", () => { item.gender = genderBox.value; });
+        }
+      } else {
+        genderBox = document.createElement("span");
       }
-      setStatus("draftStatus", `Could not draft: ${error.message}${diagnosis} Request ID: ${requestId}`, "error");
-      if (error.message.includes("Access key rejected")) disconnect();
+
+      const display = document.createElement("input");
+      display.value = item.display;
+      display.title = "How it will appear in the letter";
+      display.addEventListener("change", () => {
+        item.display = display.value.trim() || item.text;
+        if (item.label === "[RESIDENT]") renderItems();
+      });
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "small";
+      remove.textContent = "Don't hide";
+      remove.addEventListener("click", () => { items.splice(index, 1); renderItems(); });
+
+      row.append(orig, label, genderBox, display, remove);
+      list.appendChild(row);
+    });
+    if (!items.some((i) => i.label === "[RESIDENT]")) {
+      const warn = document.createElement("p");
+      warn.className = "status error";
+      warn.textContent = "No resident marked. Add the resident's name as a Person and set its label to RESIDENT.";
+      list.appendChild(warn);
+    }
+    updatePreview();
+  }
+
+  $("addButton").addEventListener("click", () => {
+    const text = $("addText").value.trim();
+    if (!text) return;
+    if (!sourceText().toLowerCase().includes(text.toLowerCase())) {
+      return setStatus("sendStatus", "That exact text is not in the notes. Copy it exactly as written.", "error");
+    }
+    const kindValue = $("addKind").value;
+    const isPerson = kindValue === "person";
+    const role = isPerson ? (items.some((i) => i.label === "[RESIDENT]") ? "PERSON" : "RESIDENT") : kindValue;
+    items.push({ text, kind: isPerson ? "person" : "place", role, gender: isPerson ? "unknown" : "",
+                 display: text, short: text, label: nextLabel(role) });
+    $("addText").value = "";
+    setStatus("sendStatus", "");
+    renderItems();
+  });
+
+  // ---------- step 1 -> 2 ----------
+  async function checkNames(forRefine) {
+    mode = forRefine ? "refine" : "draft";
+    const text = sourceText().trim();
+    const statusId = forRefine ? "refineStatus" : "notesStatus";
+    if (!text) return setStatus(statusId, forRefine ? "Type the resident's answers first." : "Paste the case notes first.", "error");
+    busy(true);
+    const stop = withTimer(statusId, "Checking for names on the home PC...");
+    try {
+      const data = await api("/api/prepare", { notes: text, case_id: forRefine ? currentCase : null });
+      items = data.items.map((i) => ({ ...i, short: i.short || i.display }));
+      stop();
+      setStatus(statusId, "");
+      $("hidePanel").classList.remove("hidden");
+      $("sendButton").textContent = forRefine ? "Send and refine" : "Send and draft";
+      renderItems();
+      $("hidePanel").scrollIntoView({ behavior: "smooth" });
+    } catch (e) {
+      stop();
+      setStatus(statusId, e.message, "error");
     } finally {
-      if (progressTimer) clearInterval(progressTimer);
-      button.disabled = !isConnected;
-      button.textContent = "Draft letter";
+      busy(false);
     }
   }
-
-  async function copyField(id) {
-    const field = $(id);
-    try {
-      await navigator.clipboard.writeText(field.value);
-      setStatus("draftStatus", `${id === "letterOutput" ? "Letter" : "Verification questions"} copied.`, "success");
-    } catch {
-      field.focus();
-      field.select();
-      setStatus("draftStatus", "Clipboard access failed. The text is selected; copy it manually.", "error");
-    }
-  }
-
-  async function copyBoth() {
-    const letter = $("letterOutput").value.trim();
-    const verify = $("verifyOutput").value.trim();
-    const combined = `LETTER\n\n${letter}${verify ? `\n\nWRITER TO VERIFY\n\n${verify}` : ""}`;
-    try {
-      await navigator.clipboard.writeText(combined);
-      setStatus("draftStatus", "Both sections copied.", "success");
-    } catch {
-      setStatus("draftStatus", "Clipboard access failed. Use the separate copy buttons.", "error");
-    }
-  }
-
-  $("connectButton").addEventListener("click", connect);
-  $("apiKey").addEventListener("keydown", event => { if (event.key === "Enter") connect(); });
-  $("disconnectButton").addEventListener("click", disconnect);
-  $("refreshStatusButton").addEventListener("click", refreshSystemStatus);
-  $("rewriteButton").addEventListener("click", rewriteNotes);
-  $("clearButton").addEventListener("click", () => {
-    $("notes").value = "";
-    $("letterOutput").value = "";
-    $("verifyOutput").value = "";
-    $("resultsPanel").classList.add("hidden");
-    $("elapsedTime").textContent = "";
-    setStatus("draftStatus", "Case notes and results cleared.");
+  $("checkButton").addEventListener("click", () => checkNames(false));
+  $("refineCheckButton").addEventListener("click", () => checkNames(true));
+  $("backButton").addEventListener("click", () => {
+    $("hidePanel").classList.add("hidden");
+    (mode === "refine" ? $("answers") : $("notes")).focus();
   });
-  document.querySelectorAll("[data-copy]").forEach(button => {
-    button.addEventListener("click", () => copyField(button.dataset.copy));
+  $("notes").addEventListener("input", () => { if (mode === "draft") updatePreview(); });
+  $("answers").addEventListener("input", () => { if (mode === "refine") updatePreview(); });
+
+  // ---------- step 2 -> 3 ----------
+  $("sendButton").addEventListener("click", async () => {
+    const resident = items.find((i) => i.label === "[RESIDENT]");
+    if (!resident) return setStatus("sendStatus", "Mark who the resident is first.", "error");
+    if (!titleOf(resident.display)) return setStatus("sendStatus", "Choose Mr, Ms or Mdm for the resident.", "error");
+    busy(true);
+    const stop = withTimer("sendStatus", "Drafting... usually 10-40 seconds.");
+    try {
+      const data = mode === "refine"
+        ? await api("/api/refine", { case_id: currentCase, answers: $("answers").value, items })
+        : await api("/api/draft", { notes: $("notes").value, items });
+      stop();
+      setStatus("sendStatus", "");
+      $("hidePanel").classList.add("hidden");
+      if (mode === "refine") $("answers").value = "";
+      showResult(data);
+      loadCases();
+    } catch (e) {
+      stop();
+      setStatus("sendStatus", e.message, "error");
+    } finally {
+      busy(false);
+    }
   });
-  $("copyAllButton").addEventListener("click", copyBoth);
+
+  // ---------- show letters ----------
+  function splitLetters(output) {
+    return output.split(/^=+\s*$/m).map((part) => {
+      const get = (name, next) => {
+        const m = part.match(new RegExp("^" + name + "\\s*\\n([\\s\\S]*?)(?=^(?:" + next + ")\\s*$|$(?![\\s\\S]))", "m"));
+        return m ? m[1].trim() : "";
+      };
+      return {
+        recipient: get("RECIPIENT", "LETTER"),
+        letter: get("LETTER", "WRITER TO VERIFY"),
+        verify: get("WRITER TO VERIFY", "RECIPIENT"),
+      };
+    }).filter((l) => l.letter || l.recipient);
+  }
+
+  function copyButton(label, getText) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "small";
+    b.textContent = label;
+    b.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(getText()); b.textContent = "Copied"; }
+      catch (e) { b.textContent = "Select and copy by hand"; }
+      setTimeout(() => { b.textContent = label; }, 1500);
+    });
+    return b;
+  }
+
+  function showResult(data) {
+    currentCase = data.case_id;
+    $("resultTitle").textContent = data.title || "Draft";
+    const info = [];
+    if (data.version) info.push("version " + data.version);
+    if (data.seconds) info.push(data.seconds + " s");
+    if (data.cost_sgd !== undefined) info.push("S$" + Number(data.cost_sgd).toFixed(2));
+    $("resultInfo").textContent = info.join(" · ");
+    const box = $("letters");
+    box.innerHTML = "";
+    const letters = splitLetters(data.output || "");
+    letters.forEach((l, n) => {
+      const block = document.createElement("div");
+      block.className = "letter-block";
+      const head = document.createElement("div");
+      head.className = "row between";
+      const rec = document.createElement("span");
+      rec.className = "recipient";
+      rec.textContent = (letters.length > 1 ? "Letter " + (n + 1) + " - " : "") + "To: " + (l.recipient || "(not stated)");
+      head.append(rec, copyButton("Copy recipient", () => l.recipient));
+
+      const letterLabel = document.createElement("div");
+      letterLabel.className = "row between";
+      const ll = document.createElement("label"); ll.textContent = "LETTER";
+      const letter = document.createElement("textarea");
+      letter.className = "output";
+      letter.value = l.letter;
+      letterLabel.append(ll, copyButton("Copy letter", () => letter.value));
+
+      const verifyLabel = document.createElement("div");
+      verifyLabel.className = "row between";
+      const vl = document.createElement("label"); vl.textContent = "WRITER TO VERIFY (not part of the letter)";
+      const verify = document.createElement("textarea");
+      verify.className = "verify";
+      verify.value = l.verify;
+      verifyLabel.append(vl, copyButton("Copy questions", () => verify.value));
+
+      block.append(head, letterLabel, letter, verifyLabel, verify);
+      box.appendChild(block);
+    });
+    if (!letters.length) {
+      const raw = document.createElement("textarea");
+      raw.className = "output";
+      raw.value = data.output || "";
+      box.appendChild(raw);
+    }
+    $("judgements").textContent = data.judgements || "";
+    $("judgementsBox").classList.toggle("hidden", !data.judgements);
+    $("resultPanel").classList.remove("hidden");
+    $("resultPanel").scrollIntoView({ behavior: "smooth" });
+  }
+
+  $("newCaseButton").addEventListener("click", () => {
+    if ($("notes").value && !confirm("Clear the notes and start a new case? Saved cases stay in the list below.")) return;
+    $("notes").value = ""; $("answers").value = "";
+    items = []; currentCase = null; mode = "draft";
+    $("hidePanel").classList.add("hidden");
+    $("resultPanel").classList.add("hidden");
+    setStatus("notesStatus", "");
+    $("notes").focus();
+  });
+
+  // ---------- saved cases ----------
+  async function loadCases() {
+    try {
+      const data = await api("/api/cases");
+      const list = $("caseList");
+      list.innerHTML = "";
+      if (!data.cases.length) { list.textContent = "No saved cases yet."; return; }
+      data.cases.forEach((c) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        const when = document.createElement("span");
+        when.className = "when";
+        when.textContent = c.created.replace("T", " ").slice(0, 16);
+        b.append(when, document.createTextNode(c.title + (c.versions > 1 ? " (" + c.versions + " versions)" : "")));
+        b.addEventListener("click", () => openCase(c.case_id));
+        list.appendChild(b);
+      });
+    } catch (e) {
+      $("caseList").textContent = e.message;
+    }
+  }
+  $("refreshCasesButton").addEventListener("click", loadCases);
+
+  async function openCase(id) {
+    try {
+      const data = await api("/api/cases/" + encodeURIComponent(id));
+      $("notes").value = data.notes;
+      $("hidePanel").classList.add("hidden");
+      showResult(data);
+    } catch (e) {
+      alert(e.message);
+    }
+  }
 </script>
 </body>
 </html>
