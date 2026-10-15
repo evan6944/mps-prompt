@@ -70,6 +70,10 @@
     .letter-block { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 12px; }
     .recipient { font-weight: 700; font-size: 1.05rem; }
     details summary { cursor: pointer; font-weight: 700; margin-top: 12px; }
+    .cheatsheet { margin-top: 8px; }
+    .cheatsheet ul { margin: 8px 0 0; padding-left: 20px; }
+    .cheatsheet li { margin-bottom: 6px; }
+    code { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: .88em; }
     .trail-item { border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; margin-top: 8px; background: var(--surface-soft); }
     .trail-item summary { font-weight: 600; margin: 0; }
     .trail-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 4px; font-size: .95rem; }
@@ -116,7 +120,25 @@
         <button id="newCaseButton" type="button" class="small">New case</button>
       </div>
       <label for="notes">Paste or type the notes</label>
-      <textarea id="notes" maxlength="20000" spellcheck="true" placeholder="resident = mr tan ah kow&#10;..."></textarea>
+      <textarea id="notes" maxlength="20000" spellcheck="true" placeholder="resident = mr tan ah kow, SC, 45, S1234567A&#10;wife = ms lim mei ling / mei ling, spr, 40&#10;boss = mr ah tiong&#10;workplace = abc logistics&#10;&#10;notes as usual..."></textarea>
+      <details class="cheatsheet">
+        <summary>How to write notes so names are hidden</summary>
+        <ul class="note">
+          <li><b>Define everything to hide with "role = name"</b>, one per line, anywhere in the notes:<br>
+            <code>resident = mr ahmad bin ali, SC, 45, S7712345A</code><br>
+            <code>wife = ms shirley / shirl, spr, 26</code><br>
+            <code>boss = mr ah tiong</code> &nbsp; <code>agent = guyukorkor, m</code><br>
+            <code>son's school = west grove secondary</code> &nbsp; <code>workplace = cck best ktv</code></li>
+          <li><b>Use "=" only for this.</b> For other notes write "work: singer" or "letters - hdb, sso".</li>
+          <li><b>The name is everything before the first comma.</b> Details after it (SC/PR, age, job) stay visible to the AI.</li>
+          <li><b>Other spellings or short forms go before the comma, after "/"</b>: <code>wife = ms shirley / shirl</code>.</li>
+          <li><b>Title gives he/she</b> (mr / ms / mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
+          <li><b>Schools, workplaces, clinics, condos and addresses get their own line</b>, not a detail on someone else's line.</li>
+          <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
+          <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
+          <li>Countries and government agencies (HDB, ICA, SSO…) are never hidden.</li>
+        </ul>
+      </details>
       <div class="row"><button id="checkButton" class="primary" type="button">Check names before sending</button></div>
       <p id="notesStatus" class="status" role="status" aria-live="polite"></p>
     </section>
@@ -124,8 +146,9 @@
     <!-- STEP 2: approve what is hidden -->
     <section class="panel hidden" id="hidePanel">
       <h2><span class="step">2</span>Check what will be hidden</h2>
+      <div id="warnings"></div>
       <p class="note">Everything in this list is replaced by its label before sending. Fix anything that is wrong, remove anything that should stay, and add anything that was missed. The resident must have a title.</p>
-      <div class="item-head"><span>In the notes</span><span>Label</span><span>He / she</span><span>Name in the letter</span><span></span></div>
+      <div class="item-head"><span>In the notes</span><span>Label</span><span>He / she</span><span>Name in the letter (first / later)</span><span></span></div>
       <div id="itemsList" class="items"></div>
       <div class="add">
         <input id="addText" placeholder="Something else to hide, exactly as written in the notes">
@@ -337,79 +360,133 @@
 
   function sourceText() { return mode === "refine" ? $("answers").value : $("notes").value; }
 
+  // The preview comes from the home PC, so it is exactly what will be sent.
+  let previewTimer = null;
   function updatePreview() {
-    $("preview").innerHTML = hideText(sourceText()).html;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const text = sourceText();
+      try {
+        const data = await api("/api/preview", { notes: text, items });
+        $("preview").innerHTML = escapeHtml(data.preview).replace(/\[[A-Z0-9 '_-]+\]/g, (m) => "<mark>" + m + "</mark>");
+      } catch (e) {
+        $("preview").textContent = "Preview not available: " + e.message;
+      }
+    }, 250);
+  }
+
+  function setTitle(item, choice) {
+    // Applies to every row of the same person (all their spellings share one label).
+    items.filter((i) => i.label === item.label).forEach((i) => {
+      if (TITLES.includes(choice)) {
+        i.display = choice + " " + stripTitle(i.display);
+        i.short = choice + " " + stripTitle(i.short || i.display);
+        i.gender = choice === "Mr" ? "he" : "she";
+      } else if (choice === "he" || choice === "she") {
+        i.display = stripTitle(i.display);
+        i.short = stripTitle(i.short || i.display);
+        i.gender = choice;
+      } else {
+        i.gender = "";
+      }
+    });
+    renderItems();
+  }
+
+  function renderWarnings(list) {
+    const box = $("warnings");
+    box.innerHTML = "";
+    (list || []).forEach((w) => {
+      const p = document.createElement("p");
+      p.className = "status error";
+      p.textContent = "Check: " + w;
+      box.appendChild(p);
+    });
   }
 
   function renderItems() {
     const list = $("itemsList");
     list.innerHTML = "";
-    items.sort((a, b) => (a.label === "[RESIDENT]" ? -1 : b.label === "[RESIDENT]" ? 1 : 0));
-    items.forEach((item, index) => {
+    // One row per label: all spellings of the same person or place are edited together.
+    const groups = new Map();
+    items.forEach((i) => { if (!groups.has(i.label)) groups.set(i.label, []); groups.get(i.label).push(i); });
+    const ordered = [...groups.entries()].sort((a, b) => (a[0] === "[RESIDENT]" ? -1 : b[0] === "[RESIDENT]" ? 1 : 0));
+    ordered.forEach(([groupLabel, members]) => {
+      members.sort((a, b) => b.text.length - a.text.length);
+      const item = members[0];
+      const each = (fn) => members.forEach(fn);
       const row = document.createElement("div");
-      row.className = "item" + (item.label === "[RESIDENT]" ? " resident" : "");
+      row.className = "item" + (groupLabel === "[RESIDENT]" ? " resident" : "");
 
       const orig = document.createElement("div");
       orig.className = "orig";
-      orig.textContent = item.text;
+      orig.textContent = item.text.replace(/^@/, "");
       const kind = document.createElement("span");
       kind.className = "kind";
-      kind.textContent = item.kind === "person" ? "person" : (item.role || "").toLowerCase();
+      const others = members.slice(1).map((m) => m.text).filter((x) => !x.startsWith("@") && !/^(mr|ms|mdm|mrs|dr|miss) /i.test(x) || members.length < 4);
+      kind.textContent = (item.kind === "person" ? "person" : (item.role || "").toLowerCase()) +
+        (others.length ? " - also hides: " + others.join(", ") : "");
       orig.appendChild(kind);
 
       const label = document.createElement("input");
-      label.value = item.label;
+      label.value = groupLabel;
       label.title = "Label sent to the AI";
       label.addEventListener("change", () => {
-        let v = label.value.trim().toUpperCase().replace(/^\[?|\]?$/g, "");
-        item.label = v ? "[" + v + "]" : nextLabel("OTHER");
-        if (item.label === "[RESIDENT]" && !titleOf(item.display)) item.gender = "";
+        const v = label.value.trim().toUpperCase().replace(/^\[?|\]?$/g, "");
+        const newLabel = v ? "[" + v + "]" : nextLabel("OTHER");
+        each((m) => { m.label = newLabel; if (newLabel === "[RESIDENT]" && !titleOf(m.display)) m.gender = ""; });
         renderItems();
       });
 
       let genderBox;
       if (item.kind === "person") {
+        // One choice sets both: Mr = he, Ms/Mdm = she, or he/she without a title.
         genderBox = document.createElement("select");
-        if (item.label === "[RESIDENT]") {
-          // The resident must have a title: Mr / Ms / Mdm.
-          const current = titleOf(item.display);
-          genderBox.innerHTML = '<option value="">Title?</option>' + TITLES.map((t) => `<option ${t === current ? "selected" : ""}>${t}</option>`).join("");
-          genderBox.addEventListener("change", () => {
-            const t = genderBox.value;
-            item.display = t ? t + " " + stripTitle(item.display) : stripTitle(item.display);
-            item.short = t ? t + " " + stripTitle(item.short || item.display) : stripTitle(item.short || "");
-            item.gender = t === "Mr" ? "he" : t ? "she" : "";
-            renderItems();
-          });
-        } else {
-          genderBox.innerHTML = ["unknown", "he", "she"].map((g) => `<option ${g === item.gender ? "selected" : ""}>${g}</option>`).join("");
-          genderBox.addEventListener("change", () => { item.gender = genderBox.value; });
-        }
+        const isResident = groupLabel === "[RESIDENT]";
+        const current = titleOf(item.display) || (isResident ? "" : (item.gender === "he" || item.gender === "she" ? item.gender : ""));
+        const choices = [["", isResident ? "Title?" : "?"], ["Mr", "Mr (he)"], ["Ms", "Ms (she)"], ["Mdm", "Mdm (she)"]]
+          .concat(isResident ? [] : [["he", "he, no title"], ["she", "she, no title"]]);
+        genderBox.innerHTML = choices.map(([v, text]) => `<option value="${v}" ${v === current ? "selected" : ""}>${text}</option>`).join("");
+        genderBox.addEventListener("change", () => setTitle(item, genderBox.value));
       } else {
         genderBox = document.createElement("span");
       }
 
+      const names = document.createElement("div");
       const display = document.createElement("input");
       display.value = item.display;
-      display.title = "How it will appear in the letter";
+      display.title = "First mention in the letter";
       display.addEventListener("change", () => {
-        item.display = display.value.trim() || item.text;
-        if (item.label === "[RESIDENT]") renderItems();
+        const value = display.value.trim() || item.text;
+        each((m) => { m.display = value; });
+        const t = titleOf(value);
+        if (t && item.kind === "person") return setTitle(item, t);  // typing "Mr ..." also sets "he"
+        renderItems();
       });
+      names.appendChild(display);
+      if (item.kind === "person") {
+        const short = document.createElement("input");
+        short.value = item.short || item.display;
+        short.title = "Later mentions in the letter, e.g. Ms Teng";
+        short.placeholder = "Later as...";
+        short.style.marginTop = "4px";
+        short.addEventListener("change", () => { const v = short.value.trim() || item.display; each((m) => { m.short = v; }); });
+        names.appendChild(short);
+      }
 
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "small";
       remove.textContent = "Don't hide";
-      remove.addEventListener("click", () => { items.splice(index, 1); renderItems(); });
+      remove.addEventListener("click", () => { items = items.filter((i) => i.label !== groupLabel); renderItems(); });
 
-      row.append(orig, label, genderBox, display, remove);
+      row.append(orig, label, genderBox, names, remove);
       list.appendChild(row);
     });
     if (!items.some((i) => i.label === "[RESIDENT]")) {
       const warn = document.createElement("p");
       warn.className = "status error";
-      warn.textContent = "No resident marked. Add the resident's name as a Person and set its label to RESIDENT.";
+      warn.textContent = "No resident marked. Add a line like \"resident = ms tan ah lian\" to the notes and check again, or set a person's label to RESIDENT.";
       list.appendChild(warn);
     }
     updatePreview();
@@ -442,6 +519,7 @@
     try {
       const data = await api("/api/prepare", { notes: text, case_id: forRefine ? currentCase : null });
       items = data.items.map((i) => ({ ...i, short: i.short || i.display }));
+      renderWarnings(data.warnings);
       stop();
       setStatus(statusId, "");
       $("hidePanel").classList.remove("hidden");
@@ -527,6 +605,12 @@
     $("resultInfo").textContent = info.join(" · ");
     const box = $("letters");
     box.innerHTML = "";
+    if (data.leftovers && data.leftovers.length) {
+      const warn = document.createElement("p");
+      warn.className = "status error";
+      warn.textContent = "Check before sending: these labels were not replaced with real names - " + data.leftovers.join(", ") + ". Fix them by hand in the letter.";
+      box.appendChild(warn);
+    }
     const letters = splitLetters(data.output || "");
     letters.forEach((l, n) => {
       const block = document.createElement("div");
