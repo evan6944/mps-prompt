@@ -35,8 +35,8 @@
     input, select { min-height: 42px; }
     textarea { resize: vertical; line-height: 1.55; }
     #notes, #answers { min-height: 220px; }
-    .output { min-height: 260px; }
-    .verify { min-height: 150px; }
+    .output { min-height: 120px; }
+    .verify { min-height: 80px; }
     button { border: 1px solid var(--border); border-radius: 8px; padding: 10px 15px; background: var(--surface-soft);
              color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
     button.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
@@ -70,6 +70,10 @@
     .letter-block { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 12px; }
     .recipient { font-weight: 700; font-size: 1.05rem; }
     details summary { cursor: pointer; font-weight: 700; margin-top: 12px; }
+    .trail-item { border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; margin-top: 8px; background: var(--surface-soft); }
+    .trail-item summary { font-weight: 600; margin: 0; }
+    .trail-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 4px; font-size: .95rem; }
+    .trail-label { color: var(--muted); font-size: .82rem; font-weight: 700; margin-top: 10px; }
     .case-list { display: grid; gap: 6px; margin-top: 8px; max-height: 360px; overflow: auto; }
     .case-list button { text-align: left; font-weight: 400; width: 100%; }
     .case-list .when { color: var(--muted); font-size: .85rem; margin-right: 8px; }
@@ -89,10 +93,10 @@
     <h1>MPS Drafter</h1>
     <p class="muted">Names and identifying details are hidden on the home PC before anything is sent to the online AI. Always read the letter before use.</p>
     <div id="loginView">
-      <label for="accessKey">Access key</label>
-      <input id="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your MPS access key">
-      <div class="row"><button id="connectButton" class="primary" type="button">Connect</button></div>
-      <p class="note">The key is kept in this page's memory only. Refreshing the page logs you out.</p>
+      <label for="accessKey">PIN</label>
+      <input id="accessKey" type="password" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Enter your MPS PIN">
+      <div class="row"><button id="connectButton" class="primary" type="button">Log in</button></div>
+      <p class="note">You stay logged in in this tab for 12 hours. Press "Log out" or close the tab when you finish, especially on a shared laptop.</p>
     </div>
     <div id="loggedInView" class="hidden">
       <div class="row between">
@@ -154,9 +158,15 @@
       <div id="letters"></div>
       <details id="judgementsBox">
         <summary>How the AI read the notes</summary>
-        <p class="note">The AI's own notes on the tricky points. Not part of the letter.</p>
+        <p class="note">The AI's own notes on the tricky points, not part of the letter. Shown exactly as it wrote them: it only ever saw labels like [RESIDENT], never the real names.</p>
         <div id="judgements" class="preview"></div>
       </details>
+
+      <div id="trailBox" class="hidden">
+        <h3>Case trail</h3>
+        <p class="note">The original notes and every earlier version, with the answers that led to each change. Click to unfold.</p>
+        <div id="trail"></div>
+      </div>
 
       <h3>Refine with the resident's answers</h3>
       <p class="note">Type what the resident told you. It goes through the same name check before sending.</p>
@@ -206,6 +216,9 @@
     }
     let data = null;
     try { data = await response.json(); } catch (e) { /* no body */ }
+    if (response.status === 401 && path !== "/api/connect") {
+      showLogin("Your login has expired. Please enter the PIN again.");
+    }
     if (!response.ok) {
       const detail = data && data.detail;
       throw new Error(typeof detail === "string" ? detail : (response.status === 401 ? "Wrong access key." : "The home PC returned an error (" + response.status + ")."));
@@ -225,13 +238,18 @@
     document.querySelectorAll("#app button").forEach((b) => { b.disabled = on; });
   }
 
-  // ---------- login ----------
-  $("connectButton").addEventListener("click", async () => {
-    accessKey = $("accessKey").value.trim();
-    if (!accessKey) return setStatus("connectStatus", "Enter the access key.", "error");
-    setStatus("connectStatus", "Connecting...");
+  // ---------- login: PIN once, then a 12-hour token kept for this tab only ----------
+  const TOKEN_KEY = "mpsSession";
+  function saveToken(t) { try { t ? sessionStorage.setItem(TOKEN_KEY, t) : sessionStorage.removeItem(TOKEN_KEY); } catch (e) { /* storage blocked: stay logged in until refresh */ } }
+  function savedToken() { try { return sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+
+  async function logIn(secret, quiet) {
+    accessKey = secret;
+    if (!quiet) setStatus("connectStatus", "Logging in...");
     try {
       const data = await api("/api/connect", {});
+      accessKey = data.token;
+      saveToken(data.token);
       $("accessKey").value = "";
       $("loginView").classList.add("hidden");
       $("loggedInView").classList.remove("hidden");
@@ -241,11 +259,42 @@
       loadCases();
     } catch (e) {
       accessKey = "";
-      setStatus("connectStatus", e.message, "error");
+      saveToken("");
+      if (!quiet) setStatus("connectStatus", e.message, "error");
     }
+  }
+
+  function showLogin(message) {
+    accessKey = "";
+    saveToken("");
+    $("loginView").classList.remove("hidden");
+    $("loggedInView").classList.add("hidden");
+    $("app").classList.add("hidden");
+    setStatus("connectStatus", message || "", message ? "error" : "");
+  }
+
+  $("connectButton").addEventListener("click", () => {
+    const pin = $("accessKey").value.trim();
+    if (!pin) return setStatus("connectStatus", "Enter the PIN.", "error");
+    logIn(pin, false);
   });
   $("accessKey").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connectButton").click(); });
-  $("logoutButton").addEventListener("click", () => location.reload());
+  $("logoutButton").addEventListener("click", async () => {
+    try { await api("/api/logout", {}); } catch (e) { /* already logged out */ }
+    showLogin();
+    location.reload();
+  });
+  if (savedToken()) logIn(savedToken(), true);
+
+  // Boxes open at full height for the first read; they can still be dragged smaller.
+  function fitHeight(textarea) {
+    const fit = () => {
+      textarea.style.height = "auto";
+      textarea.style.height = (textarea.scrollHeight + 6) + "px";
+    };
+    fit();
+    requestAnimationFrame(fit);  // again once fonts and layout have settled
+  }
 
   // ---------- labels and preview (same rules as the home PC) ----------
   const TITLES = ["Mr", "Ms", "Mdm"];
@@ -517,7 +566,56 @@
     $("judgements").textContent = data.judgements || "";
     $("judgementsBox").classList.toggle("hidden", !data.judgements);
     $("resultPanel").classList.remove("hidden");
+    box.querySelectorAll("textarea").forEach(fitHeight);
     $("resultPanel").scrollIntoView({ behavior: "smooth" });
+    if (data.versions) renderTrail(data); else loadTrail(data.case_id);
+  }
+
+  // ---------- case trail: original notes + earlier versions, folded ----------
+  async function loadTrail(id) {
+    if (!id) return;
+    try { renderTrail(await api("/api/cases/" + encodeURIComponent(id))); } catch (e) { /* trail is optional */ }
+  }
+
+  function fold(title, parts, open) {
+    const d = document.createElement("details");
+    d.className = "trail-item";
+    d.open = !!open;
+    const s = document.createElement("summary");
+    s.textContent = title;
+    d.appendChild(s);
+    parts.forEach(([label, text]) => {
+      if (!text) return;
+      const l = document.createElement("div");
+      l.className = "trail-label";
+      l.textContent = label;
+      const t = document.createElement("div");
+      t.className = "trail-text";
+      t.textContent = text;
+      d.append(l, t);
+    });
+    return d;
+  }
+
+  function renderTrail(data) {
+    const trail = $("trail");
+    trail.innerHTML = "";
+    trail.appendChild(fold("Original notes", [["As typed at the interview", data.notes]]));
+    const versions = data.versions || [];
+    versions.forEach((v) => {
+      const when = (v.time || "").replace("T", " ").slice(0, 16);
+      const isLatest = v.number === versions.length;
+      const letters = splitLetters(v.output || "");
+      const asked = letters.map((l) => l.verify).filter(Boolean).join("\n\n");
+      const text = letters.map((l) => (letters.length > 1 ? "To: " + l.recipient + "\n" : "") + l.letter).join("\n\n----------\n\n");
+      const title = "Version " + v.number + " - " + when + (v.number === 1 ? " (first draft)" : " (after the resident's answers)") + (isLatest ? " - shown above" : "");
+      trail.appendChild(fold(title, [
+        ["Resident's answers that led to this version", v.answers],
+        ["Letter", isLatest ? "" : text],
+        ["Questions it asked the writer to check", asked],
+      ]));
+    });
+    $("trailBox").classList.toggle("hidden", versions.length === 0);
   }
 
   $("newCaseButton").addEventListener("click", () => {
