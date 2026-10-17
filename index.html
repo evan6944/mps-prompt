@@ -41,6 +41,8 @@
              color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
     button.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
     button.small { padding: 6px 10px; font-size: .88rem; }
+    label.tick { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+    label.tick input { width: auto; min-height: 0; margin: 0; }
     button:disabled { opacity: .48; cursor: wait; }
     .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
     .between { justify-content: space-between; }
@@ -138,8 +140,10 @@
           <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
           <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
           <li>Countries and government agencies (HDB, ICA, SSO…) are never hidden.</li>
+          <li><b>Follow-up cases:</b> tick "Follow-up" or write "follow up" in the notes. Split the notes into <code>previously:</code>, <code>agency reply:</code>, <code>changes since last letter:</code> and <code>current letter:</code>. For a saved case, open it and click "Start a follow-up letter from this case".</li>
         </ul>
       </details>
+      <label class="tick"><input type="checkbox" id="followUp"> Follow-up on an earlier letter (writing "follow up" in the notes does the same)</label>
       <div class="row"><button id="checkButton" class="primary" type="button">Check names before sending</button></div>
       <p id="notesStatus" class="status" role="status" aria-live="polite"></p>
     </section>
@@ -158,7 +162,11 @@
           <option value="ADDRESS">Address</option>
           <option value="SCHOOL">School</option>
           <option value="WORKPLACE">Workplace / company</option>
-          <option value="CLINIC">Clinic / hospital</option>
+          <option value="CLINIC">Clinic / polyclinic</option>
+          <option value="HOSPITAL">Hospital</option>
+          <option value="NURSING HOME">Nursing home / care centre</option>
+          <option value="CONDO">Condo / building</option>
+          <option value="PLACE">Place (mall, MRT, park...)</option>
           <option value="NUMBER">Number (NRIC, phone...)</option>
           <option value="OTHER">Other</option>
         </select>
@@ -180,6 +188,7 @@
         <span id="resultInfo" class="note"></span>
       </div>
       <div id="letters"></div>
+      <div class="row"><button id="followUpButton" type="button" class="small">Start a follow-up letter from this case</button></div>
       <details id="judgementsBox">
         <summary>How the AI read the notes</summary>
         <p class="note">The AI's own notes on the tricky points, not part of the letter. Shown exactly as it wrote them: it only ever saw labels like [RESIDENT], never the real names.</p>
@@ -220,6 +229,8 @@
   let items = [];          // what will be hidden
   let mode = "draft";      // "draft" (new case) or "refine" (answers for currentCase)
   let currentCase = null;  // case id of the letter on screen
+  let followUpOf = null;   // the saved case a new follow-up letter starts from
+  let lastOutput = "";     // the letter(s) on screen
 
   const $ = (id) => document.getElementById(id);
 
@@ -460,7 +471,7 @@
       display.title = "First mention in the letter";
       display.addEventListener("change", () => {
         const value = display.value.trim() || item.text;
-        each((m) => { m.display = value; });
+        each((m) => { m.display = value; if (m.kind !== "person") m.short = value; });
         const t = titleOf(value);
         if (t && item.kind === "person") return setTitle(item, t);  // typing "Mr ..." also sets "he"
         renderItems();
@@ -505,6 +516,7 @@
     const role = isPerson ? (items.some((i) => i.label === "[RESIDENT]") ? "PERSON" : "RESIDENT") : kindValue;
     items.push({ text, kind: isPerson ? "person" : "place", role, gender: isPerson ? "unknown" : "",
                  display: text, short: text, label: nextLabel(role) });
+    // (for places the server always uses the "Name in the letter" for every mention)
     $("addText").value = "";
     setStatus("sendStatus", "");
     renderItems();
@@ -519,7 +531,8 @@
     busy(true);
     const stop = withTimer(statusId, "Checking for names on the home PC...");
     try {
-      const data = await api("/api/prepare", { notes: text, case_id: forRefine ? currentCase : null });
+      const data = await api("/api/prepare", { notes: text, case_id: forRefine ? currentCase : null,
+                                               follow_up_of: forRefine ? null : followUpOf });
       items = data.items.map((i) => ({ ...i, short: i.short || i.display }));
       renderWarnings(data.warnings);
       stop();
@@ -554,7 +567,7 @@
     try {
       const data = mode === "refine"
         ? await api("/api/refine", { case_id: currentCase, answers: $("answers").value, items })
-        : await api("/api/draft", { notes: $("notes").value, items });
+        : await api("/api/draft", { notes: $("notes").value, items, follow_up: $("followUp").checked, follow_up_of: followUpOf });
       stop();
       setStatus("sendStatus", "");
       $("hidePanel").classList.add("hidden");
@@ -609,6 +622,7 @@
   function showResult(data) {
     if (data.balance) showBalance(data.balance);
     currentCase = data.case_id;
+    lastOutput = data.output || "";
     $("resultTitle").textContent = data.title || "Draft";
     const info = [];
     if (data.version) info.push("version " + data.version);
@@ -723,11 +737,45 @@
 
   $("newCaseButton").addEventListener("click", () => {
     if ($("notes").value && !confirm("Clear the notes and start a new case? Saved cases stay in the list below.")) return;
-    $("notes").value = ""; $("answers").value = "";
-    items = []; currentCase = null; mode = "draft";
+    $("notes").value = ""; $("answers").value = ""; $("addText").value = "";
+    items = []; currentCase = null; mode = "draft"; followUpOf = null; $("followUp").checked = false;
+    renderWarnings([]); renderItems();
     $("hidePanel").classList.add("hidden");
     $("resultPanel").classList.add("hidden");
     setStatus("notesStatus", "");
+    $("notes").focus();
+  });
+
+  // ---------- follow-up from the case on screen ----------
+  $("followUpButton").addEventListener("click", () => {
+    if (!currentCase) return;
+    if (!confirm("Start a new follow-up letter from this case? The notes box will be replaced (this case stays saved).")) return;
+    const id = currentCase;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const drafted = id.slice(6, 8) + " " + months[Number(id.slice(4, 6)) - 1] + " " + id.slice(0, 4);
+    const definitions = $("notes").value.split("\n").filter((l) => /^\s*[a-z][a-z0-9 '’\/&()-]{0,40}?\s*=\s*\S/i.test(l));
+    const letters = splitLetters(lastOutput).map((l) => "(to " + (l.recipient || "?") + ")\n" + l.letter).join("\n\n");
+    $("notes").value = [
+      "follow up case, previous letter dated " + drafted + " (date drafted - change to the date sent), our reference ",
+      definitions.join("\n"),
+      "",
+      "previously (the earlier letter - shorten if you like):",
+      letters,
+      "",
+      "agency reply:",
+      "",
+      "changes since last letter:",
+      "",
+      "current letter:",
+      "",
+    ].join("\n");
+    $("answers").value = ""; $("addText").value = "";
+    items = []; currentCase = null; mode = "draft"; followUpOf = id; $("followUp").checked = true;
+    renderWarnings([]); renderItems();
+    $("hidePanel").classList.add("hidden");
+    $("resultPanel").classList.add("hidden");
+    setStatus("notesStatus", "Follow-up started. Fill in the agency reply, the changes and the new requests, then check names.");
+    $("notes").dispatchEvent(new Event("input"));
     $("notes").focus();
   });
 
@@ -758,6 +806,8 @@
     try {
       const data = await api("/api/cases/" + encodeURIComponent(id));
       $("notes").value = data.notes;
+      $("followUp").checked = !!data.follow_up;
+      followUpOf = null;
       $("hidePanel").classList.add("hidden");
       showResult(data);
     } catch (e) {
