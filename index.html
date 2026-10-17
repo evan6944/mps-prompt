@@ -106,6 +106,7 @@
       <div class="row between">
         <span class="connected">Connected to the home PC</span>
         <span id="modelName" class="note"></span>
+        <span id="credit" class="note"></span>
         <button id="logoutButton" type="button" class="small">Log out</button>
       </div>
     </div>
@@ -132,7 +133,7 @@
           <li><b>Use "=" only for this.</b> For other notes write "work: singer" or "letters - hdb, sso".</li>
           <li><b>The name is everything before the first comma.</b> Details after it (SC/PR, age, job) stay visible to the AI.</li>
           <li><b>Other spellings or short forms go before the comma, after "/"</b>: <code>wife = ms shirley / shirl</code>.</li>
-          <li><b>Title gives he/she</b> (mr / ms / mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
+          <li><b>Title gives he/she</b> (mr / ms - never mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
           <li><b>Schools, workplaces, clinics, condos and addresses get their own line</b>, not a detail on someone else's line.</li>
           <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
           <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
@@ -278,6 +279,7 @@
       $("loggedInView").classList.remove("hidden");
       $("app").classList.remove("hidden");
       $("modelName").textContent = "Writing with " + data.model;
+      showBalance(data.balance);
       setStatus("connectStatus", "");
       loadCases();
     } catch (e) {
@@ -320,7 +322,7 @@
   }
 
   // ---------- labels and preview (same rules as the home PC) ----------
-  const TITLES = ["Mr", "Ms", "Mdm"];
+  const TITLES = ["Mr", "Ms"];  // the Internal Guide allows Mr or Ms only
   const stripTitle = (s) => (s || "").replace(/^(Mr|Ms|Mdm|Mrs|Dr)\.?\s+/i, "");
   const titleOf = (s) => { const m = (s || "").match(/^(Mr|Ms|Mdm|Mrs|Dr)\b/i); return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : ""; };
   const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -440,11 +442,11 @@
 
       let genderBox;
       if (item.kind === "person") {
-        // One choice sets both: Mr = he, Ms/Mdm = she, or he/she without a title.
+        // One choice sets both: Mr = he, Ms = she, or he/she without a title.
         genderBox = document.createElement("select");
         const isResident = groupLabel === "[RESIDENT]";
         const current = titleOf(item.display) || (isResident ? "" : (item.gender === "he" || item.gender === "she" ? item.gender : ""));
-        const choices = [["", isResident ? "Title?" : "?"], ["Mr", "Mr (he)"], ["Ms", "Ms (she)"], ["Mdm", "Mdm (she)"]]
+        const choices = [["", isResident ? "Title?" : "?"], ["Mr", "Mr (he)"], ["Ms", "Ms (she)"]]
           .concat(isResident ? [] : [["he", "he, no title"], ["she", "she, no title"]]);
         genderBox.innerHTML = choices.map(([v, text]) => `<option value="${v}" ${v === current ? "selected" : ""}>${text}</option>`).join("");
         genderBox.addEventListener("change", () => setTitle(item, genderBox.value));
@@ -546,7 +548,7 @@
   $("sendButton").addEventListener("click", async () => {
     const resident = items.find((i) => i.label === "[RESIDENT]");
     if (!resident) return setStatus("sendStatus", "Mark who the resident is first.", "error");
-    if (!titleOf(resident.display)) return setStatus("sendStatus", "Choose Mr, Ms or Mdm for the resident.", "error");
+    if (!titleOf(resident.display)) return setStatus("sendStatus", "Choose Mr or Ms for the resident.", "error");
     busy(true);
     const stop = withTimer("sendStatus", "Drafting... usually 10-40 seconds.");
     try {
@@ -575,7 +577,8 @@
         return m ? m[1].trim() : "";
       };
       return {
-        recipient: get("RECIPIENT", "LETTER"),
+        recipient: get("RECIPIENT", "CC|LETTER"),
+        cc: get("CC", "LETTER"),
         letter: get("LETTER", "WRITER TO VERIFY"),
         verify: get("WRITER TO VERIFY", "RECIPIENT"),
       };
@@ -595,7 +598,16 @@
     return b;
   }
 
+  function showBalance(b) {
+    const el = $("credit");
+    if (!b) { el.textContent = ""; return; }
+    el.textContent = "Credit left: US$" + b.usd.toFixed(2) + " (about S$" + b.sgd.toFixed(2) + ")" +
+      (b.low ? " - LOW: please top up " + b.company + " soon" : "");
+    el.className = b.low ? "status error" : "note";
+  }
+
   function showResult(data) {
+    if (data.balance) showBalance(data.balance);
     currentCase = data.case_id;
     $("resultTitle").textContent = data.title || "Draft";
     const info = [];
@@ -621,6 +633,13 @@
       rec.className = "recipient";
       rec.textContent = (letters.length > 1 ? "Letter " + (n + 1) + " - " : "") + "To: " + (l.recipient || "(not stated)");
       head.append(rec, copyButton("Copy recipient", () => l.recipient));
+      const ccRow = document.createElement("div");
+      ccRow.className = "row between";
+      const cc = document.createElement("span");
+      cc.textContent = "CC: " + (l.cc || "(none given)");
+      if (/writer to decide/i.test(l.cc || "")) cc.className = "status error";
+      ccRow.append(cc);
+      if (l.cc && !/writer to decide|^none/i.test(l.cc)) ccRow.append(copyButton("Copy CC", () => l.cc));
 
       const letterLabel = document.createElement("div");
       letterLabel.className = "row between";
@@ -638,7 +657,7 @@
       verify.value = l.verify;
       verifyLabel.append(vl, copyButton("Copy questions", () => verify.value));
 
-      block.append(head, letterLabel, letter, verifyLabel, verify);
+      block.append(head, ccRow, letterLabel, letter, verifyLabel, verify);
       box.appendChild(block);
     });
     if (!letters.length) {
