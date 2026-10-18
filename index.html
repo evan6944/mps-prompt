@@ -149,7 +149,7 @@
       <label for="notes" id="notesLabel">Paste or type the notes</label>
       <textarea id="notes" maxlength="20000" spellcheck="true"></textarea>
       <div id="followUpBoxes" class="hidden">
-        <label for="fuPrev">Previously - what the earlier letter covered</label>
+        <label for="fuPrev">Previously - what the earlier letter covered <span class="note">(filled in from a saved case; delete anything less important)</span></label>
         <textarea id="fuPrev" class="fu" maxlength="20000" spellcheck="true" placeholder="lives far from bus stops, mobility issues, appealed for a bus stop near her flat"></textarea>
         <label for="fuReply">Agency reply</label>
         <textarea id="fuReply" class="fu" maxlength="20000" spellcheck="true" placeholder="lta says no changes until the next review (leave empty if no reply yet)"></textarea>
@@ -312,7 +312,11 @@
     $("notes").style.minHeight = on ? "110px" : "";
   }
   $("modeNew").addEventListener("click", () => setFollowUpMode(false));
-  $("modeFollow").addEventListener("click", () => setFollowUpMode(true));
+  $("modeFollow").addEventListener("click", () => {
+    // With a finished letter on screen, "Follow-up" starts one from it (earlier letter filled in).
+    if (!followUpMode && currentCase && lastOutput && !$("resultPanel").classList.contains("hidden")) return startFollowUp(true);
+    setFollowUpMode(true);
+  });
   setFollowUpMode(false);
 
   // What is sent for a new draft: the notes, plus the follow-up boxes under their headings.
@@ -719,7 +723,7 @@
       stop();
       setStatus("sendStatus", "");
       $("hidePanel").classList.add("hidden");
-      if (mode === "refine") $("answers").value = "";
+      if (mode === "refine") { appendAnswers($("answers").value); $("answers").value = ""; }
       showResult(data);
       loadCases();
     } catch (e) {
@@ -892,13 +896,15 @@
   });
 
   // ---------- follow-up from the case on screen ----------
-  $("followUpButton").addEventListener("click", () => {
+  $("followUpButton").addEventListener("click", () => startFollowUp(true));
+  function startFollowUp(ask) {
     if (!currentCase) return;
-    if (!confirm("Start a new follow-up letter from this case? The notes box will be replaced (this case stays saved).")) return;
+    if (ask && !confirm("Start a new follow-up letter from this case? The notes box will be replaced (this case stays saved).")) return;
     const id = currentCase;
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const drafted = id.slice(6, 8) + " " + months[Number(id.slice(4, 6)) - 1] + " " + id.slice(0, 4);
-    const letters = splitLetters(lastOutput).map((l) => "(to " + (l.recipient || "?") + ")\n" + l.letter).join("\n\n");
+    const letters = splitLetters(lastOutput).map((l) => "(to " + (l.recipient || "?") + ")\n" +
+      l.letter.replace(/\s*Please assist [^\n]*$/i, "")).join("\n\n");
     const notes = $("notes").value;
     clearDraft();
     setFollowUpMode(true);
@@ -907,10 +913,20 @@
       notes.split("\n").filter((l) => /^\s*[a-z][a-z0-9 '’\/&()-]{0,40}?\s*=\s*\S/i.test(l)).join("\n");
     $("fuPrev").value = letters;
     [$("notes"), $("fuPrev")].forEach(fitHeight);
-    setStatus("notesStatus", "Follow-up started. Fill in the agency reply, the changes and what is new, then check names.");
+    setStatus("notesStatus", "Follow-up started. The earlier letter is under \"Previously\" - delete anything less important. Then fill in the agency reply, the changes and what is new.");
     window.scrollTo({ top: 0 });
     $("fuReply").focus();
-  });
+  }
+
+  // Answers given on refinement are kept with the notes, labelled, so the whole case reads in one place.
+  function answersBlock(answers, when) {
+    return "resident's answers (added " + (when || new Date().toISOString()).slice(0, 10) + "):\n" + answers.trim();
+  }
+  function appendAnswers(answers, when) {
+    if (!answers || !answers.trim()) return;
+    const box = followUpMode ? $("fuNow") : $("notes");
+    box.value = (box.value.trim() ? box.value.trimEnd() + "\n\n" : "") + answersBlock(answers, when);
+  }
 
   // ---------- saved cases ----------
   async function loadCases() {
@@ -950,6 +966,7 @@
       clearDraft();
       setFollowUpMode(!!data.follow_up);
       if (data.follow_up) fillFollowUp(data.notes); else $("notes").value = data.notes;
+      (data.versions || []).forEach((v) => appendAnswers(v.answers, v.time));
       showTab("draftView");
       showResult(data);
     } catch (e) {
