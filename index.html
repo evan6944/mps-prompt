@@ -83,6 +83,19 @@
     .case-list { display: grid; gap: 6px; margin-top: 8px; max-height: 360px; overflow: auto; }
     .case-list button { text-align: left; font-weight: 400; width: 100%; }
     .case-list .when { color: var(--muted); font-size: .85rem; margin-right: 8px; }
+    a { color: var(--primary); font-weight: 700; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .tab { background: var(--surface); }
+    .tab.on, .seg.on { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+    .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg { border: 0; border-radius: 0; }
+    textarea.fu { min-height: 90px; }
+    .summary { margin: 4px 0 10px; }
+    .chip { display: inline-block; border: 1px solid var(--border); border-radius: 999px; padding: 1px 10px;
+            margin: 3px 4px 3px 0; background: var(--surface-soft); font-size: .88rem; }
+    .chip b { color: var(--mark-text); background: var(--mark); border-radius: 4px; padding: 0 3px; font-weight: 600; }
+    details.fold { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 2px; }
+    #caseSearch { margin-top: 4px; }
     footer { color: var(--muted); font-size: .82rem; padding: 0 4px; }
     @media (max-width: 720px) {
       body { padding: 12px 12px 30px; }
@@ -116,42 +129,48 @@
   </header>
 
   <div id="app" class="hidden">
+    <nav class="tabs" aria-label="Sections">
+      <button type="button" class="tab on" data-tab="draftView">Draft</button>
+      <button type="button" class="tab" data-tab="casesView">Saved cases</button>
+      <button type="button" class="tab" data-tab="guideView">Guide</button>
+    </nav>
+
+    <div id="draftView">
     <!-- STEP 1: notes -->
     <section class="panel" id="notesPanel">
       <div class="row between">
         <h2><span class="step">1</span>Case notes</h2>
-        <button id="newCaseButton" type="button" class="small">New case</button>
+        <button id="newCaseButton" type="button" class="small">Clear / new case</button>
       </div>
-      <label for="notes">Paste or type the notes</label>
-      <textarea id="notes" maxlength="20000" spellcheck="true" placeholder="resident = mr tan ah kow, SC, 45, S1234567A&#10;wife = ms lim mei ling / mei ling, spr, 40&#10;boss = mr ah tiong&#10;workplace = abc logistics&#10;&#10;notes as usual..."></textarea>
-      <details class="cheatsheet">
-        <summary>How to write notes so names are hidden</summary>
-        <ul class="note">
-          <li><b>Define everything to hide with "role = name"</b>, one per line, anywhere in the notes:<br>
-            <code>resident = mr ahmad bin ali, SC, 45, S7712345A</code><br>
-            <code>wife = ms shirley / shirl, spr, 26</code><br>
-            <code>boss = mr ah tiong</code> &nbsp; <code>agent = guyukorkor, m</code><br>
-            <code>son's school = west grove secondary</code> &nbsp; <code>workplace = cck best ktv</code></li>
-          <li><b>Use "=" only for this.</b> For other notes write "work: singer" or "letters - hdb, sso".</li>
-          <li><b>The name is everything before the first comma.</b> Details after it (SC/PR, age, job) stay visible to the AI.</li>
-          <li><b>Other spellings or short forms go before the comma, after "/"</b>: <code>wife = ms shirley / shirl</code>.</li>
-          <li><b>Title gives he/she</b> (mr / ms - never mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
-          <li><b>Schools, workplaces, clinics, condos and addresses get their own line</b>, not a detail on someone else's line.</li>
-          <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
-          <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
-          <li>Countries and government agencies (HDB, ICA, SSO…) are never hidden.</li>
-          <li><b>Follow-up cases:</b> tick "Follow-up" or write "follow up" in the notes. Split the notes into <code>previously:</code>, <code>agency reply:</code>, <code>changes since last letter:</code> and <code>current letter:</code>. For a saved case, open it and click "Start a follow-up letter from this case".</li>
-        </ul>
-      </details>
-      <label class="tick"><input type="checkbox" id="followUp"> Follow-up on an earlier letter (writing "follow up" in the notes does the same)</label>
+      <div class="segmented" role="group" aria-label="Type of case">
+        <button type="button" id="modeNew" class="seg on">New case</button>
+        <button type="button" id="modeFollow" class="seg">Follow-up</button>
+      </div>
+      <label for="notes" id="notesLabel">Paste or type the notes</label>
+      <textarea id="notes" maxlength="20000" spellcheck="true"></textarea>
+      <div id="followUpBoxes" class="hidden">
+        <label for="fuPrev">Previously - what the earlier letter covered</label>
+        <textarea id="fuPrev" class="fu" maxlength="20000" spellcheck="true" placeholder="lives far from bus stops, mobility issues, appealed for a bus stop near her flat"></textarea>
+        <label for="fuReply">Agency reply</label>
+        <textarea id="fuReply" class="fu" maxlength="20000" spellcheck="true" placeholder="lta says no changes until the next review (leave empty if no reply yet)"></textarea>
+        <label for="fuChanges">Changes since the last letter</label>
+        <textarea id="fuChanges" class="fu" maxlength="20000" spellcheck="true" placeholder="slipped and fell last week walking to the bus stop..."></textarea>
+        <label for="fuNow">This letter - new requests and anything else new</label>
+        <textarea id="fuNow" class="fu" maxlength="20000" spellcheck="true" placeholder="wants lta to review now instead of waiting..."></textarea>
+      </div>
+      <p class="note">Not sure how to write the notes? See the <a href="#" id="guideLink">Guide</a>.</p>
       <div class="row"><button id="checkButton" class="primary" type="button">Check names before sending</button></div>
       <p id="notesStatus" class="status" role="status" aria-live="polite"></p>
     </section>
+
 
     <!-- STEP 2: approve what is hidden -->
     <section class="panel hidden" id="hidePanel">
       <h2><span class="step">2</span>Check what will be hidden</h2>
       <div id="warnings"></div>
+      <div id="hideSummary" class="summary"></div>
+      <button id="toggleDetails" type="button" class="small">Show the full list and exactly what will be sent</button>
+      <div id="hideDetails">
       <p class="note">Everything in this list is replaced by its label before sending. Fix anything that is wrong, remove anything that should stay, and add anything that was missed. The resident must have a title.</p>
       <div class="item-head"><span>In the notes</span><span>Label</span><span>He / she</span><span>Name in the letter (first / later)</span><span></span></div>
       <div id="itemsList" class="items"></div>
@@ -174,6 +193,7 @@
       </div>
       <h3>Exactly what will be sent</h3>
       <div id="preview" class="preview" aria-live="polite"></div>
+      </div>
       <div class="row">
         <button id="sendButton" class="primary" type="button">Send and draft</button>
         <button id="backButton" type="button">Back to notes</button>
@@ -189,34 +209,65 @@
       </div>
       <div id="letters"></div>
       <div class="row"><button id="followUpButton" type="button" class="small">Start a follow-up letter from this case</button></div>
-      <details id="judgementsBox">
+
+      <details id="refineBox" class="fold">
+        <summary>Refine with the resident's answers</summary>
+        <p class="note">Type what the resident told you. It goes through the same name check before sending.</p>
+        <textarea id="answers" maxlength="20000" spellcheck="true" placeholder="e.g. rejection letter dated 12 feb 2026, applied alone..."></textarea>
+        <div class="row"><button id="refineCheckButton" class="primary" type="button">Check names before sending</button></div>
+        <p id="refineStatus" class="status" role="status" aria-live="polite"></p>
+      </details>
+
+      <details id="judgementsBox" class="fold">
         <summary>How the AI read the notes</summary>
         <p class="note">The AI's own notes on the tricky points, not part of the letter. Shown exactly as it wrote them: it only ever saw labels like [RESIDENT], never the real names.</p>
         <div id="judgements" class="preview"></div>
       </details>
 
-      <div id="trailBox" class="hidden">
-        <h3>Case trail</h3>
+      <details id="trailBox" class="fold hidden">
+        <summary>Case trail (original notes and earlier versions)</summary>
         <p class="note">The original notes and every earlier version, with the answers that led to each change. Click to unfold.</p>
         <div id="trail"></div>
-      </div>
-
-      <h3>Refine with the resident's answers</h3>
-      <p class="note">Type what the resident told you. It goes through the same name check before sending.</p>
-      <textarea id="answers" maxlength="20000" spellcheck="true" placeholder="e.g. rejection letter dated 12 feb 2026, applied alone..."></textarea>
-      <div class="row"><button id="refineCheckButton" class="primary" type="button">Check names before sending</button></div>
-      <p id="refineStatus" class="status" role="status" aria-live="polite"></p>
+      </details>
     </section>
+    </div>
 
-    <!-- HISTORY -->
+    <!-- SAVED CASES -->
+    <div id="casesView" class="hidden">
     <section class="panel">
       <div class="row between">
         <h2>Saved cases</h2>
         <button id="refreshCasesButton" type="button" class="small">Refresh</button>
       </div>
       <p class="note">Saved on the home PC only. Click a case to open it.</p>
+      <input id="caseSearch" type="search" placeholder="Search by name, agency or date" autocomplete="off">
       <div id="caseList" class="case-list"></div>
     </section>
+    </div>
+
+    <!-- GUIDE -->
+    <div id="guideView" class="hidden">
+    <section class="panel cheatsheet">
+      <h2>How to write case notes</h2>
+        <ul class="note">
+          <li><b>Define everything to hide with "role = name"</b>, one per line, anywhere in the notes:<br>
+            <code>resident = mr ahmad bin ali, SC, 45, S7712345A</code><br>
+            <code>wife = ms shirley / shirl, spr, 26</code><br>
+            <code>boss = mr ah tiong</code> &nbsp; <code>agent = guyukorkor, m</code><br>
+            <code>son's school = west grove secondary</code> &nbsp; <code>workplace = cck best ktv</code></li>
+          <li><b>Use "=" only for this.</b> For other notes write "work: singer" or "letters - hdb, sso".</li>
+          <li><b>The name is everything before the first comma.</b> Details after it (SC/PR, age, job) stay visible to the AI.</li>
+          <li><b>Other spellings or short forms go before the comma, after "/"</b>: <code>wife = ms shirley / shirl</code>.</li>
+          <li><b>Title gives he/she</b> (mr / ms - never mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
+          <li><b>Schools, workplaces, clinics, condos and addresses get their own line</b>, not a detail on someone else's line.</li>
+          <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
+          <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
+          <li>Countries and government agencies (HDB, ICA, SSO…) are never hidden.</li>
+          <li><b>Follow-up cases:</b> choose "Follow-up" at the top of the notes and fill in the boxes: what the earlier letter covered, the agency's reply, what has changed, and what is new in this letter. Put the <code>role = name</code> lines and the earlier letter's date and reference in the first box. (Writing "follow up" in ordinary notes also works.)</li>
+          <li><b>Follow-up on a case drafted here:</b> open it under "Saved cases" and click "Start a follow-up letter from this case" - the earlier letter is filled in for you.</li>
+        </ul>
+    </section>
+    </div>
   </div>
   <footer>Keep resident information within approved systems. Drafts are suggestions and need human review.</footer>
 </main>
@@ -231,8 +282,73 @@
   let currentCase = null;  // case id of the letter on screen
   let followUpOf = null;   // the saved case a new follow-up letter starts from
   let lastOutput = "";     // the letter(s) on screen
+  let followUpMode = false; // "Follow-up" chosen at the top of the notes
 
   const $ = (id) => document.getElementById(id);
+
+  // ---------- tabs: Draft | Saved cases | Guide ----------
+  function showTab(id) {
+    ["draftView", "casesView", "guideView"].forEach((v) => $(v).classList.toggle("hidden", v !== id));
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === id));
+    window.scrollTo({ top: 0 });
+  }
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+    if (t.dataset.tab === "casesView") loadCases();
+    showTab(t.dataset.tab);
+  }));
+  $("guideLink").addEventListener("click", (e) => { e.preventDefault(); showTab("guideView"); });
+
+  // ---------- new case / follow-up ----------
+  const FU_BOXES = [["fuPrev", "previously:"], ["fuReply", "agency reply:"], ["fuChanges", "changes since last letter:"], ["fuNow", "current letter:"]];
+  function setFollowUpMode(on) {
+    followUpMode = on;
+    $("modeNew").classList.toggle("on", !on);
+    $("modeFollow").classList.toggle("on", on);
+    $("followUpBoxes").classList.toggle("hidden", !on);
+    $("notesLabel").textContent = on ? "Names, and the earlier letter's date and reference" : "Paste or type the notes";
+    $("notes").placeholder = on
+      ? "previous letter dated 1 aug 2026, our reference ABC-KK3-2-244\nresident = ms lee siew chin\nnursing home = ren ci"
+      : "resident = mr tan ah kow, SC, 45, S1234567A\nwife = ms lim mei ling / mei ling, spr, 40\nboss = mr ah tiong\nworkplace = abc logistics\n\nnotes as usual...";
+    $("notes").style.minHeight = on ? "110px" : "";
+  }
+  $("modeNew").addEventListener("click", () => setFollowUpMode(false));
+  $("modeFollow").addEventListener("click", () => setFollowUpMode(true));
+  setFollowUpMode(false);
+
+  // What is sent for a new draft: the notes, plus the follow-up boxes under their headings.
+  function draftText() {
+    if (!followUpMode) return $("notes").value;
+    let head = $("notes").value.trim();
+    if (!/follow[\s-]?up/i.test(head)) head = "follow up case\n" + head;
+    const parts = [head];
+    FU_BOXES.forEach(([id, heading]) => { const v = $(id).value.trim(); if (v) parts.push(heading + "\n" + v); });
+    return parts.join("\n\n");
+  }
+
+  // A saved follow-up case: put each part back in its box.
+  function fillFollowUp(notes) {
+    const heads = [["fuPrev", /^\s*previously\b[^:\n]*:[ \t]*/i], ["fuReply", /^\s*agency reply\b[^:\n]*:[ \t]*/i],
+                   ["fuChanges", /^\s*changes since\b[^:\n]*:[ \t]*/i], ["fuNow", /^\s*(?:current|this) letter\b[^:\n]*:[ \t]*/i]];
+    const out = { notes: [], fuPrev: [], fuReply: [], fuChanges: [], fuNow: [] };
+    let current = "notes";
+    notes.split("\n").forEach((line) => {
+      const hit = heads.find(([, re]) => re.test(line));
+      if (hit) { current = hit[0]; line = line.replace(hit[1], ""); if (!line.trim()) return; }
+      out[current].push(line);
+    });
+    let head = out.notes.join("\n").trim().replace(/^follow[\s-]?up case\s*\n/i, "");
+    $("notes").value = head;
+    FU_BOXES.forEach(([id]) => { $(id).value = out[id].join("\n").trim(); });
+  }
+
+  function clearDraft() {
+    $("notes").value = ""; $("answers").value = ""; $("addText").value = "";
+    FU_BOXES.forEach(([id]) => { $(id).value = ""; });
+    items = []; currentCase = null; mode = "draft"; followUpOf = null;
+    renderWarnings([]); renderItems();
+    $("hidePanel").classList.add("hidden");
+    $("resultPanel").classList.add("hidden");
+  }
 
   function setStatus(id, text, kind) {
     const el = $(id);
@@ -371,7 +487,7 @@
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  function sourceText() { return mode === "refine" ? $("answers").value : $("notes").value; }
+  function sourceText() { return mode === "refine" ? $("answers").value : draftText(); }
 
   // The preview comes from the home PC, so it is exactly what will be sent.
   let previewTimer = null;
@@ -502,8 +618,38 @@
       warn.textContent = "No resident marked. Add a line like \"resident = ms tan ah lian\" to the notes and check again, or set a person's label to RESIDENT.";
       list.appendChild(warn);
     }
+    renderSummary();
     updatePreview();
   }
+
+  // Step 2 at a glance: one chip per hidden name, so most cases need no unfolding.
+  function residentReady() {
+    const r = items.find((i) => i.label === "[RESIDENT]");
+    return !!(r && titleOf(r.display));
+  }
+  function renderSummary() {
+    const box = $("hideSummary");
+    box.innerHTML = "";
+    const seen = new Map();
+    items.forEach((i) => { if (!seen.has(i.label)) seen.set(i.label, i); });
+    const intro = document.createElement("div");
+    intro.className = "note";
+    intro.textContent = seen.size ? seen.size + " thing" + (seen.size > 1 ? "s" : "") + " will be hidden:" : "Nothing will be hidden.";
+    box.appendChild(intro);
+    [...seen.entries()].sort((a, b) => (a[0] === "[RESIDENT]" ? -1 : b[0] === "[RESIDENT]" ? 1 : 0)).forEach(([label, i]) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      const b = document.createElement("b");
+      b.textContent = label;
+      chip.append(document.createTextNode((i.display || i.text) + " → "), b);
+      box.appendChild(chip);
+    });
+  }
+  function showDetails(on) {
+    $("hideDetails").classList.toggle("hidden", !on);
+    $("toggleDetails").textContent = on ? "Hide the full list" : "Show the full list and exactly what will be sent";
+  }
+  $("toggleDetails").addEventListener("click", () => showDetails($("hideDetails").classList.contains("hidden")));
 
   $("addButton").addEventListener("click", () => {
     const text = $("addText").value.trim();
@@ -535,6 +681,7 @@
                                                follow_up_of: forRefine ? null : followUpOf });
       items = data.items.map((i) => ({ ...i, short: i.short || i.display }));
       renderWarnings(data.warnings);
+      showDetails(data.warnings.length > 0 || !residentReady());  // open only when something needs attention
       stop();
       setStatus(statusId, "");
       $("hidePanel").classList.remove("hidden");
@@ -554,20 +701,21 @@
     $("hidePanel").classList.add("hidden");
     (mode === "refine" ? $("answers") : $("notes")).focus();
   });
-  $("notes").addEventListener("input", () => { if (mode === "draft") updatePreview(); });
+  ["notes"].concat(FU_BOXES.map(([id]) => id)).forEach((id) =>
+    $(id).addEventListener("input", () => { if (mode === "draft") updatePreview(); }));
   $("answers").addEventListener("input", () => { if (mode === "refine") updatePreview(); });
 
   // ---------- step 2 -> 3 ----------
   $("sendButton").addEventListener("click", async () => {
     const resident = items.find((i) => i.label === "[RESIDENT]");
     if (!resident) return setStatus("sendStatus", "Mark who the resident is first.", "error");
-    if (!titleOf(resident.display)) return setStatus("sendStatus", "Choose Mr or Ms for the resident.", "error");
+    if (!titleOf(resident.display)) { showDetails(true); return setStatus("sendStatus", "Choose Mr or Ms for the resident.", "error"); }
     busy(true);
     const stop = withTimer("sendStatus", "Drafting... usually 10-40 seconds.");
     try {
       const data = mode === "refine"
         ? await api("/api/refine", { case_id: currentCase, answers: $("answers").value, items })
-        : await api("/api/draft", { notes: $("notes").value, items, follow_up: $("followUp").checked, follow_up_of: followUpOf });
+        : await api("/api/draft", { notes: draftText(), items, follow_up: followUpMode, follow_up_of: followUpOf });
       stop();
       setStatus("sendStatus", "");
       $("hidePanel").classList.add("hidden");
@@ -736,12 +884,9 @@
   }
 
   $("newCaseButton").addEventListener("click", () => {
-    if ($("notes").value && !confirm("Clear the notes and start a new case? Saved cases stay in the list below.")) return;
-    $("notes").value = ""; $("answers").value = ""; $("addText").value = "";
-    items = []; currentCase = null; mode = "draft"; followUpOf = null; $("followUp").checked = false;
-    renderWarnings([]); renderItems();
-    $("hidePanel").classList.add("hidden");
-    $("resultPanel").classList.add("hidden");
+    if (draftText().trim() && !confirm("Clear the notes and start a new case? Saved cases stay under \"Saved cases\".")) return;
+    clearDraft();
+    setFollowUpMode(false);
     setStatus("notesStatus", "");
     $("notes").focus();
   });
@@ -753,30 +898,18 @@
     const id = currentCase;
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const drafted = id.slice(6, 8) + " " + months[Number(id.slice(4, 6)) - 1] + " " + id.slice(0, 4);
-    const definitions = $("notes").value.split("\n").filter((l) => /^\s*[a-z][a-z0-9 '’\/&()-]{0,40}?\s*=\s*\S/i.test(l));
     const letters = splitLetters(lastOutput).map((l) => "(to " + (l.recipient || "?") + ")\n" + l.letter).join("\n\n");
-    $("notes").value = [
-      "follow up case, previous letter dated " + drafted + " (date drafted - change to the date sent), our reference ",
-      definitions.join("\n"),
-      "",
-      "previously (the earlier letter - shorten if you like):",
-      letters,
-      "",
-      "agency reply:",
-      "",
-      "changes since last letter:",
-      "",
-      "current letter:",
-      "",
-    ].join("\n");
-    $("answers").value = ""; $("addText").value = "";
-    items = []; currentCase = null; mode = "draft"; followUpOf = id; $("followUp").checked = true;
-    renderWarnings([]); renderItems();
-    $("hidePanel").classList.add("hidden");
-    $("resultPanel").classList.add("hidden");
-    setStatus("notesStatus", "Follow-up started. Fill in the agency reply, the changes and the new requests, then check names.");
-    $("notes").dispatchEvent(new Event("input"));
-    $("notes").focus();
+    const notes = $("notes").value;
+    clearDraft();
+    setFollowUpMode(true);
+    followUpOf = id;
+    $("notes").value = "previous letter dated " + drafted + " (date drafted - change to the date sent), our reference \n" +
+      notes.split("\n").filter((l) => /^\s*[a-z][a-z0-9 '’\/&()-]{0,40}?\s*=\s*\S/i.test(l)).join("\n");
+    $("fuPrev").value = letters;
+    [$("notes"), $("fuPrev")].forEach(fitHeight);
+    setStatus("notesStatus", "Follow-up started. Fill in the agency reply, the changes and what is new, then check names.");
+    window.scrollTo({ top: 0 });
+    $("fuReply").focus();
   });
 
   // ---------- saved cases ----------
@@ -796,19 +929,28 @@
         b.addEventListener("click", () => openCase(c.case_id));
         list.appendChild(b);
       });
+      filterCases();
     } catch (e) {
       $("caseList").textContent = e.message;
     }
   }
   $("refreshCasesButton").addEventListener("click", loadCases);
+  function filterCases() {
+    const words = $("caseSearch").value.toLowerCase().split(/\s+/).filter(Boolean);
+    $("caseList").querySelectorAll("button").forEach((b) => {
+      const text = b.textContent.toLowerCase();
+      b.classList.toggle("hidden", !words.every((w) => text.includes(w)));
+    });
+  }
+  $("caseSearch").addEventListener("input", filterCases);
 
   async function openCase(id) {
     try {
       const data = await api("/api/cases/" + encodeURIComponent(id));
-      $("notes").value = data.notes;
-      $("followUp").checked = !!data.follow_up;
-      followUpOf = null;
-      $("hidePanel").classList.add("hidden");
+      clearDraft();
+      setFollowUpMode(!!data.follow_up);
+      if (data.follow_up) fillFollowUp(data.notes); else $("notes").value = data.notes;
+      showTab("draftView");
       showResult(data);
     } catch (e) {
       alert(e.message);
