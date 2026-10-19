@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>MPS Drafter</title>
+  <title>MPS Assistant</title>
   <style>
     :root {
       --page: #f2f4f7; --surface: #ffffff; --surface-soft: #f8fafc; --text: #17202b; --muted: #5d6877;
@@ -84,7 +84,13 @@
     .case-list button { text-align: left; font-weight: 400; width: 100%; }
     .case-list .when { color: var(--muted); font-size: .85rem; margin-right: 8px; }
     a { color: var(--primary); font-weight: 700; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .topbar { margin: 0 0 14px; }
+    .checklist label { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; margin: 6px 0; }
+    .checklist input { width: auto; min-height: 0; margin: 4px 0 0; flex: none; }
+    .checklist input:checked + span { text-decoration: line-through; color: var(--muted); }
+    .case-list .month { margin: 12px 0 2px; font-size: .95rem; color: var(--muted); }
+    .case-list b { font-weight: 700; }
     .tab { background: var(--surface); }
     .tab.on, .seg.on { background: var(--primary); color: var(--on-primary); border-color: transparent; }
     .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -108,32 +114,28 @@
 </head>
 <body>
 <main>
-  <header class="panel">
-    <h1>MPS Drafter</h1>
-    <p class="muted">Names and identifying details are hidden on the home PC before anything is sent to the online AI. Always read the letter before use.</p>
-    <div id="loginView">
+  <header class="panel" id="loginPanel">
+    <h1>MPS Assistant</h1>
+    <!-- A real form, so the phone keyboard's Go / Enter key logs in. -->
+    <form id="loginView" autocomplete="off">
       <label for="accessKey">PIN</label>
-      <input id="accessKey" type="password" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Enter your MPS PIN">
-      <div class="row"><button id="connectButton" class="primary" type="button">Log in</button></div>
+      <input id="accessKey" type="password" inputmode="numeric" enterkeyhint="go" autocomplete="off" spellcheck="false" placeholder="Enter your MPS PIN">
+      <div class="row"><button id="connectButton" class="primary" type="submit">Log in</button></div>
       <p class="note">You stay logged in in this tab for 12 hours. Press "Log out" or close the tab when you finish, especially on a shared laptop.</p>
-    </div>
-    <div id="loggedInView" class="hidden">
-      <div class="row between">
-        <span class="connected">Connected to the home PC</span>
-        <span id="modelName" class="note"></span>
-        <span id="credit" class="note"></span>
-        <button id="logoutButton" type="button" class="small">Log out</button>
-      </div>
-    </div>
+    </form>
     <p id="connectStatus" class="status" role="status" aria-live="polite"></p>
   </header>
 
   <div id="app" class="hidden">
-    <nav class="tabs" aria-label="Sections">
-      <button type="button" class="tab on" data-tab="draftView">Draft</button>
-      <button type="button" class="tab" data-tab="casesView">Saved cases</button>
-      <button type="button" class="tab" data-tab="guideView">Guide</button>
-    </nav>
+    <div class="row between topbar">
+      <nav class="tabs" aria-label="Sections">
+        <button type="button" class="tab on" data-tab="draftView">Draft</button>
+        <button type="button" class="tab" data-tab="casesView">Saved cases</button>
+        <button type="button" class="tab" data-tab="guideView">Guide</button>
+      </nav>
+      <button id="logoutButton" type="button" class="small">Log out</button>
+    </div>
+    <p id="credit" class="status error hidden" role="status"></p>
 
     <div id="draftView">
     <!-- STEP 1: notes -->
@@ -158,15 +160,14 @@
         <label for="fuNow">This letter - new requests and anything else new</label>
         <textarea id="fuNow" class="fu" maxlength="20000" spellcheck="true" placeholder="wants lta to review now instead of waiting..."></textarea>
       </div>
-      <p class="note">Not sure how to write the notes? See the <a href="#" id="guideLink">Guide</a>.</p>
-      <div class="row"><button id="checkButton" class="primary" type="button">Check names before sending</button></div>
+      <div class="row"><button id="checkButton" class="primary" type="button">Process Identities</button></div>
       <p id="notesStatus" class="status" role="status" aria-live="polite"></p>
     </section>
 
 
     <!-- STEP 2: approve what is hidden -->
     <section class="panel hidden" id="hidePanel">
-      <h2><span class="step">2</span>Check what will be hidden</h2>
+      <h2><span class="step">2</span>Identities</h2>
       <div id="warnings"></div>
       <div id="hideSummary" class="summary"></div>
       <button id="toggleDetails" type="button" class="small">Show the full list and exactly what will be sent</button>
@@ -208,13 +209,17 @@
         <span id="resultInfo" class="note"></span>
       </div>
       <div id="letters"></div>
-      <div class="row"><button id="followUpButton" type="button" class="small">Start a follow-up letter from this case</button></div>
+      <div class="row">
+        <button id="saveFinalButton" type="button" class="small">Save as final (my edited version)</button>
+        <button id="followUpButton" type="button" class="small">Start a follow-up letter from this case</button>
+      </div>
+      <p id="finalStatus" class="status" role="status" aria-live="polite"></p>
 
       <details id="refineBox" class="fold">
         <summary>Refine with the resident's answers</summary>
         <p class="note">Type what the resident told you. It goes through the same name check before sending.</p>
         <textarea id="answers" maxlength="20000" spellcheck="true" placeholder="e.g. rejection letter dated 12 feb 2026, applied alone..."></textarea>
-        <div class="row"><button id="refineCheckButton" class="primary" type="button">Check names before sending</button></div>
+        <div class="row"><button id="refineCheckButton" class="primary" type="button">Process Identities</button></div>
         <p id="refineStatus" class="status" role="status" aria-live="polite"></p>
       </details>
 
@@ -253,12 +258,12 @@
           <li><b>Define everything to hide with "role = name"</b>, one per line, anywhere in the notes:<br>
             <code>resident = mr ahmad bin ali, SC, 45, S7712345A</code><br>
             <code>wife = ms shirley / shirl, spr, 26</code><br>
-            <code>boss = mr ah tiong</code> &nbsp; <code>agent = guyukorkor, m</code><br>
+            <code>boss = mr ah tiong</code> &nbsp; <code>agent = alex tan, m</code><br>
             <code>son's school = west grove secondary</code> &nbsp; <code>workplace = cck best ktv</code></li>
           <li><b>Use "=" only for this.</b> For other notes write "work: singer" or "letters - hdb, sso".</li>
           <li><b>The name is everything before the first comma.</b> Details after it (SC/PR, age, job) stay visible to the AI.</li>
           <li><b>Other spellings or short forms go before the comma, after "/"</b>: <code>wife = ms shirley / shirl</code>.</li>
-          <li><b>Title gives he/she</b> (mr / ms - never mdm). No title? Add "m" or "f": <code>agent = guyukorkor, m</code>. The resident always needs a title.</li>
+          <li><b>Title gives he/she</b> (mr / ms - never mdm). No title? Add "m" or "f": <code>agent = alex tan, m</code>. The resident always needs a title.</li>
           <li><b>Schools, workplaces, clinics, condos and addresses get their own line</b>, not a detail on someone else's line.</li>
           <li><b>Numbers are hidden automatically</b>: NRIC/FIN, phone, email, DOB, postal code, unit, UEN, car plate, long numbers.</li>
           <li><b>Names that are everyday words</b> (May, Hope, Mark…): write them with a title or "@" in the notes: <code>ms may</code> or <code>@may</code>.</li>
@@ -269,7 +274,6 @@
     </section>
     </div>
   </div>
-  <footer>Keep resident information within approved systems. Drafts are suggestions and need human review.</footer>
 </main>
 
 <script>
@@ -283,6 +287,7 @@
   let followUpOf = null;   // the saved case a new follow-up letter starts from
   let lastOutput = "";     // the letter(s) on screen
   let followUpMode = false; // "Follow-up" chosen at the top of the notes
+  let letterBoxes = [];    // the letter boxes on screen (the writer may edit them)
 
   const $ = (id) => document.getElementById(id);
 
@@ -296,7 +301,6 @@
     if (t.dataset.tab === "casesView") loadCases();
     showTab(t.dataset.tab);
   }));
-  $("guideLink").addEventListener("click", (e) => { e.preventDefault(); showTab("guideView"); });
 
   // ---------- new case / follow-up ----------
   const FU_BOXES = [["fuPrev", "previously:"], ["fuReply", "agency reply:"], ["fuChanges", "changes since last letter:"], ["fuNow", "current letter:"]];
@@ -406,10 +410,8 @@
       accessKey = data.token;
       saveToken(data.token);
       $("accessKey").value = "";
-      $("loginView").classList.add("hidden");
-      $("loggedInView").classList.remove("hidden");
+      $("loginPanel").classList.add("hidden");
       $("app").classList.remove("hidden");
-      $("modelName").textContent = "Writing with " + data.model;
       showBalance(data.balance);
       setStatus("connectStatus", "");
       loadCases();
@@ -423,19 +425,23 @@
   function showLogin(message) {
     accessKey = "";
     saveToken("");
-    $("loginView").classList.remove("hidden");
-    $("loggedInView").classList.add("hidden");
+    $("loginPanel").classList.remove("hidden");
     $("app").classList.add("hidden");
     setStatus("connectStatus", message || "", message ? "error" : "");
   }
 
-  $("connectButton").addEventListener("click", () => {
+  // The iPhone number pad has no Go key, so on iPhone/iPad the normal keyboard is used (tap "123" for digits).
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) $("accessKey").removeAttribute("inputmode");
+  $("loginView").addEventListener("submit", (e) => {
+    e.preventDefault();
     const pin = $("accessKey").value.trim();
     if (!pin) return setStatus("connectStatus", "Enter the PIN.", "error");
+    $("accessKey").blur();  // closes the phone keyboard
     logIn(pin, false);
   });
-  $("accessKey").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connectButton").click(); });
   $("logoutButton").addEventListener("click", async () => {
+    if (!okToLeave()) return;
     try { await api("/api/logout", {}); } catch (e) { /* already logged out */ }
     showLogin();
     location.reload();
@@ -714,6 +720,7 @@
     const resident = items.find((i) => i.label === "[RESIDENT]");
     if (!resident) return setStatus("sendStatus", "Mark who the resident is first.", "error");
     if (!titleOf(resident.display)) { showDetails(true); return setStatus("sendStatus", "Choose Mr or Ms for the resident.", "error"); }
+    if (mode === "refine" && !okToLeave()) return;  // the refined draft replaces the letter on screen
     busy(true);
     const stop = withTimer("sendStatus", "Drafting... usually 10-40 seconds.");
     try {
@@ -764,18 +771,30 @@
   }
 
   function showBalance(b) {
+    // Shown only when credit is low.
     const el = $("credit");
-    if (!b) { el.textContent = ""; return; }
-    el.textContent = "Credit left: US$" + b.usd.toFixed(2) + " (about S$" + b.sgd.toFixed(2) + ")" +
-      (b.low ? " - LOW: please top up " + b.company + " soon" : "");
-    el.className = b.low ? "status error" : "note";
+    el.classList.toggle("hidden", !(b && b.low));
+    if (b && b.low) el.textContent = "Credit is low: US$" + b.usd.toFixed(2) + " (about S$" + b.sgd.toFixed(2) + ") left. Please top up " + b.company + " soon.";
   }
+
+  // ---------- unsaved edits to the letter ----------
+  let unsavedEdits = false;
+  function markEdited(on) {
+    unsavedEdits = on;
+    $("saveFinalButton").textContent = on ? "Save as final (unsaved edits)" : "Save as final (my edited version)";
+    $("saveFinalButton").classList.toggle("primary", on);
+  }
+  function okToLeave() {
+    return !unsavedEdits || confirm("Your edits to the letter are not saved as final. Leave without saving them?");
+  }
+  window.addEventListener("beforeunload", (e) => { if (unsavedEdits) { e.preventDefault(); e.returnValue = ""; } });
 
   function showResult(data) {
     if (data.balance) showBalance(data.balance);
     currentCase = data.case_id;
     lastOutput = data.output || "";
-    $("resultTitle").textContent = data.title || "Draft";
+    $("resultTitle").textContent = "Letter" + (data.title ? " · " + data.title : "");
+    markEdited(false);
     const info = [];
     if (data.version) info.push("version " + data.version);
     if (data.seconds) info.push(data.seconds + " s");
@@ -790,6 +809,12 @@
       box.appendChild(warn);
     }
     const letters = splitLetters(data.output || "");
+    // A saved final version (the writer's own edits) is shown instead of the AI draft, unless the case was refined since.
+    const latestTime = (data.versions || []).map((v) => v.time).sort().pop() || "";
+    const final = data.final && data.final.time >= latestTime ? data.final : null;
+    if (final) final.letters.forEach((f, n) => { if (letters[n]) letters[n].letter = f.letter; });
+    setStatus("finalStatus", final ? "Showing your final version, saved " + final.time.replace("T", " ").slice(0, 16) + "." : "", final ? "success" : "");
+    letterBoxes = [];
     letters.forEach((l, n) => {
       const block = document.createElement("div");
       block.className = "letter-block";
@@ -813,15 +838,33 @@
       const letter = document.createElement("textarea");
       letter.className = "output";
       letter.value = l.letter;
+      letterBoxes.push({ recipient: l.recipient, cc: l.cc, box: letter });
+      letter.addEventListener("input", () => markEdited(true));
       letterLabel.append(ll, copyButton("Copy letter", () => letter.value));
 
       const verifyLabel = document.createElement("div");
       verifyLabel.className = "row between";
       const vl = document.createElement("label"); vl.textContent = "WRITER TO VERIFY (not part of the letter)";
-      const verify = document.createElement("textarea");
-      verify.className = "verify";
-      verify.value = l.verify;
-      verifyLabel.append(vl, copyButton("Copy questions", () => verify.value));
+      // A tick list: tick each question once asked. Ticks are not saved anywhere.
+      const verify = document.createElement("div");
+      verify.className = "checklist";
+      const questions = [];
+      (l.verify || "").split("\n").forEach((line) => {
+        if (/^\s*[-*•]\s+/.test(line)) questions.push(line.replace(/^\s*[-*•]\s+/, ""));
+        else if (line.trim() && questions.length) questions[questions.length - 1] += " " + line.trim();
+        else if (line.trim()) questions.push(line.trim());
+      });
+      questions.forEach((q) => {
+        const row = document.createElement("label");
+        const tick = document.createElement("input");
+        tick.type = "checkbox";
+        const text = document.createElement("span");
+        text.textContent = q;
+        row.append(tick, text);
+        verify.appendChild(row);
+      });
+      if (!questions.length) verify.textContent = "(none)";
+      verifyLabel.append(vl, copyButton("Copy questions", () => l.verify));
 
       block.append(head, ccRow, letterLabel, letter, verifyLabel, verify);
       box.appendChild(block);
@@ -888,8 +931,10 @@
   }
 
   $("newCaseButton").addEventListener("click", () => {
+    if (!okToLeave()) return;
     if (draftText().trim() && !confirm("Clear the notes and start a new case? Saved cases stay under \"Saved cases\".")) return;
     clearDraft();
+    markEdited(false);
     setFollowUpMode(false);
     setStatus("notesStatus", "");
     $("notes").focus();
@@ -897,14 +942,30 @@
 
   // ---------- follow-up from the case on screen ----------
   $("followUpButton").addEventListener("click", () => startFollowUp(true));
+
+  // ---------- save the writer's edited letter(s) as the final version, for the record ----------
+  $("saveFinalButton").addEventListener("click", async () => {
+    if (!currentCase || !letterBoxes.length) return;
+    try {
+      const data = await api("/api/cases/" + encodeURIComponent(currentCase) + "/final",
+        { letters: letterBoxes.map((l) => ({ recipient: l.recipient || "", cc: l.cc || "", letter: l.box.value })) });
+      markEdited(false);
+      setStatus("finalStatus", "Saved as final, " + data.time.replace("T", " ").slice(0, 16) + ". It opens with this case from now on.", "success");
+      loadCases();
+    } catch (e) {
+      setStatus("finalStatus", e.message, "error");
+    }
+  });
   function startFollowUp(ask) {
-    if (!currentCase) return;
+    if (!currentCase || !okToLeave()) return;
     if (ask && !confirm("Start a new follow-up letter from this case? The notes box will be replaced (this case stays saved).")) return;
+    markEdited(false);
     const id = currentCase;
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const drafted = id.slice(6, 8) + " " + months[Number(id.slice(4, 6)) - 1] + " " + id.slice(0, 4);
-    const letters = splitLetters(lastOutput).map((l) => "(to " + (l.recipient || "?") + ")\n" +
-      l.letter.replace(/\s*Please assist [^\n]*$/i, "")).join("\n\n");
+    // The letters as shown on screen, so the writer's edits (or saved final version) are what is followed up.
+    const letters = letterBoxes.map((l) => "(to " + (l.recipient || "?") + ")\n" +
+      l.box.value.trim().replace(/\s*Please assist [^\n]*$/i, "")).join("\n\n");
     const notes = $("notes").value;
     clearDraft();
     setFollowUpMode(true);
@@ -913,7 +974,7 @@
       notes.split("\n").filter((l) => /^\s*[a-z][a-z0-9 '’\/&()-]{0,40}?\s*=\s*\S/i.test(l)).join("\n");
     $("fuPrev").value = letters;
     [$("notes"), $("fuPrev")].forEach(fitHeight);
-    setStatus("notesStatus", "Follow-up started. The earlier letter is under \"Previously\" - delete anything less important. Then fill in the agency reply, the changes and what is new.");
+    setStatus("notesStatus", "Follow-up started. The earlier letter is under \"Previously\" - delete anything less important. Then fill in the agency reply, the changes and what is new, and press Process Identities.");
     window.scrollTo({ top: 0 });
     $("fuReply").focus();
   }
@@ -935,13 +996,27 @@
       const list = $("caseList");
       list.innerHTML = "";
       if (!data.cases.length) { list.textContent = "No saved cases yet."; return; }
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      let lastMonth = "";
       data.cases.forEach((c) => {
+        const month = c.created.slice(0, 7);
+        if (month !== lastMonth) {  // one heading per month
+          lastMonth = month;
+          const h = document.createElement("h3");
+          h.className = "month";
+          h.textContent = months[Number(month.slice(5, 7)) - 1] + " " + month.slice(0, 4);
+          list.appendChild(h);
+        }
         const b = document.createElement("button");
         b.type = "button";
         const when = document.createElement("span");
         when.className = "when";
-        when.textContent = c.created.replace("T", " ").slice(0, 16);
-        b.append(when, document.createTextNode(c.title + (c.versions > 1 ? " (" + c.versions + " versions)" : "")));
+        when.textContent = Number(c.created.slice(8, 10)) + " " + months[Number(month.slice(5, 7)) - 1].slice(0, 3) + ", " + c.created.slice(11, 16);
+        const parts = (c.title || "").split(" - ");
+        const agencies = document.createElement("b");
+        agencies.textContent = parts.length > 1 ? parts.pop() : "";
+        b.append(when, agencies, document.createTextNode((agencies.textContent ? " - " : "") + parts.join(" - ") +
+          (c.versions > 1 ? " (" + c.versions + " versions)" : "") + (c.final ? " - final saved" : "")));
         b.addEventListener("click", () => openCase(c.case_id));
         list.appendChild(b);
       });
@@ -957,10 +1032,17 @@
       const text = b.textContent.toLowerCase();
       b.classList.toggle("hidden", !words.every((w) => text.includes(w)));
     });
+    // Hide a month heading when none of its cases match.
+    $("caseList").querySelectorAll(".month").forEach((h) => {
+      let n = h.nextElementSibling, any = false;
+      while (n && n.tagName === "BUTTON") { if (!n.classList.contains("hidden")) any = true; n = n.nextElementSibling; }
+      h.classList.toggle("hidden", !any);
+    });
   }
   $("caseSearch").addEventListener("input", filterCases);
 
   async function openCase(id) {
+    if (!okToLeave()) return;
     try {
       const data = await api("/api/cases/" + encodeURIComponent(id));
       clearDraft();
